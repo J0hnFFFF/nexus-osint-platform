@@ -3,9 +3,20 @@ import { GoogleGenAI, Schema, Type } from "@google/genai";
 import { IntelNode, NodeType, Tool, Connection, ToolCategory, AIModelConfig } from "../types";
 import { ENTITY_DEFAULT_FIELDS } from "../constants";
 
-const getAI = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key not found");
+const getAI = async () => {
+  let apiKey = process.env.API_KEY;
+
+  // 在 Electron 环境中，优先从本地存储获取 API Key
+  if (typeof window !== 'undefined' && (window as any).electronAPI) {
+    try {
+      const storedKey = await (window as any).electronAPI.getApiKey();
+      if (storedKey) apiKey = storedKey;
+    } catch (e) {
+      console.warn('Failed to get API key from Electron store:', e);
+    }
+  }
+
+  if (!apiKey) throw new Error("API Key not found. Please configure your Gemini API Key in settings.");
   return new GoogleGenAI({ apiKey });
 };
 
@@ -37,13 +48,13 @@ const fetchMockApiData = async (tool: Tool, node: IntelNode): Promise<any> => {
  * CORE EXECUTION ENGINE
  */
 export const executeTool = async (
-  tool: Tool, 
-  node: IntelNode, 
+  tool: Tool,
+  node: IntelNode,
   allNodes: IntelNode[],
   aiConfig: AIModelConfig
 ): Promise<{ newNodes: IntelNode[], newConnections: Connection[], updateData?: any }> => {
   try {
-    const ai = getAI();
+    const ai = await getAI();
     let finalPrompt = tool.promptTemplate || "";
     let toolsConfig: any = [];
     let systemInstruction = `
@@ -256,7 +267,7 @@ export const executeTool = async (
 };
 
 export const generateFinalReport = async (nodes: IntelNode[], persona: string): Promise<string> => {
-    const ai = getAI();
+    const ai = await getAI();
     const context = nodes.map(n => {
         const safeData = { ...n.data };
         for (const key in safeData) {

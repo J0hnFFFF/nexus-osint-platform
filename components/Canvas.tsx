@@ -254,9 +254,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       >
         {/* SVG Layer - Z-Index 0 (Behind Nodes) */}
         {/* Note: width/height set to large value to ensure visibility in all browsers despite 0x0 parent */}
-        <svg 
+        <svg
             className="absolute top-0 left-0 overflow-visible pointer-events-none z-0"
-            style={{ width: '100%', height: '100%', overflow: 'visible' }}
+            style={{ width: '20000px', height: '20000px', overflow: 'visible' }}
         >
           <defs>
              {/* refX=10 ensures the arrow tip (at x=10) touches the target point exactly */}

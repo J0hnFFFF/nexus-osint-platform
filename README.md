@@ -85,6 +85,7 @@ Nexus 支持被打包为独立的桌面应用程序（.exe / .dmg / .AppImage）
 ```bash
 # 1. 安装 Electron 依赖
 npm install electron electron-builder --save-dev
+npm run build
 
 # 2. 调试桌面版
 npm run electron:dev

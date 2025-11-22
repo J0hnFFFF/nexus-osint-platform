@@ -55,6 +55,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reportText, setReportText] = useState('');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  // API Key Management
+  const [apiKey, setApiKey] = useState<string>('');
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
   
   // Plugin Creator State
   const [isCreatingTool, setIsCreatingTool] = useState(false);
@@ -75,13 +81,72 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   useEffect(() => {
     if (selectedNodes.length > 0) {
       setActiveTab('inspector');
-    } 
+    }
   }, [selectedNodes.length]);
+
+  // Check for API Key on component mount
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        try {
+          const key = await (window as any).electronAPI.getApiKey();
+          if (key) {
+            setApiKey(key);
+            setHasApiKey(true);
+            onLog('✅ API Key 已加载', 'success');
+          } else {
+            setHasApiKey(false);
+            onLog('⚠️ 未配置 API Key', 'warning');
+          }
+        } catch (error) {
+          console.error('Failed to get API key:', error);
+        }
+      }
+    };
+    checkApiKey();
+  }, [onLog]);
 
   const handleTabChange = (tab: typeof activeTab) => {
       setActiveTab(tab);
       // Optional: Log tab switching if needed, but might be too noisy
-      // onLog(`切换视图面板: ${tab.toUpperCase()}`, 'info'); 
+      // onLog(`切换视图面板: ${tab.toUpperCase()}`, 'info');
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyInput.trim()) {
+      onLog('❌ API Key 不能为空', 'error');
+      return;
+    }
+
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      try {
+        await (window as any).electronAPI.setApiKey(apiKeyInput.trim());
+        setApiKey(apiKeyInput.trim());
+        setHasApiKey(true);
+        setApiKeyInput('');
+        onLog('✅ API Key 已保存', 'success');
+      } catch (error) {
+        onLog('❌ 保存 API Key 失败', 'error');
+        console.error('Failed to save API key:', error);
+      }
+    } else {
+      onLog('⚠️ Electron 环境不可用', 'warning');
+    }
+  };
+
+  const handleDeleteApiKey = async () => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      try {
+        await (window as any).electronAPI.deleteApiKey();
+        setApiKey('');
+        setHasApiKey(false);
+        setApiKeyInput('');
+        onLog('🗑️ API Key 已删除', 'warning');
+      } catch (error) {
+        onLog('❌ 删除 API Key 失败', 'error');
+        console.error('Failed to delete API key:', error);
+      }
+    }
   };
 
   const handleSaveTool = () => {
@@ -887,9 +952,81 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="flex flex-col h-full bg-slate-950">
             <div className="p-4 border-b border-slate-800 flex items-center gap-2 bg-slate-900/30">
                 <Sliders className="w-4 h-4 text-cyan-400" />
-                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">AI 模型配置 (System Config)</span>
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">系统设置 (System Config)</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* API Key Section */}
+                <div className="space-y-3">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-2">
+                        <Key className="w-3.5 h-3.5" /> Gemini API Key
+                    </label>
+                    {hasApiKey ? (
+                        <div className="bg-green-900/20 border border-green-500/30 rounded p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-green-400 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    API Key 已配置
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type={showApiKey ? "text" : "password"}
+                                    value={showApiKey ? apiKey : '••••••••••••••••••••••••••'}
+                                    readOnly
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300 font-mono"
+                                />
+                                <button
+                                    onClick={() => setShowApiKey(!showApiKey)}
+                                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs transition-colors"
+                                >
+                                    <Eye className="w-4 h-4 text-slate-400" />
+                                </button>
+                            </div>
+                            <button
+                                onClick={handleDeleteApiKey}
+                                className="w-full px-3 py-2 bg-red-900/30 hover:bg-red-900/50 border border-red-500/30 rounded text-xs text-red-400 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                删除 API Key
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3 space-y-3">
+                            <div className="flex items-center gap-2 text-yellow-400 text-xs">
+                                <AlertTriangle className="w-4 h-4" />
+                                未配置 API Key，AI 功能将无法使用
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="输入您的 Gemini API Key"
+                                value={apiKeyInput}
+                                onChange={(e) => setApiKeyInput(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleSaveApiKey}
+                                    className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-xs text-white font-medium transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Save className="w-3.5 h-3.5" />
+                                    保存 API Key
+                                </button>
+                                <a
+                                    href="https://aistudio.google.com/apikey"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300 transition-colors flex items-center gap-2"
+                                >
+                                    <Globe className="w-3.5 h-3.5" />
+                                    获取
+                                </a>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t border-slate-800/50"></div>
+
                 <div className="space-y-3">
                     <label className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-2">
                         <Bot className="w-3.5 h-3.5" /> 基础模型 (Backbone)
