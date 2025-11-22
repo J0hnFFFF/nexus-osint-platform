@@ -146,15 +146,15 @@ graph TD
     A[App Container] --> B[Canvas Engine]
     A --> C[Control Panel]
     A --> D[Gemini Service]
-    
+
     B --> E[Node Rendering]
-    B --> F[Connection Rendering (SVG)]
-    B --> G[Interaction Handler (Pointer Events)]
-    
+    B --> F[Connection Rendering - SVG]
+    B --> G[Interaction Handler - Pointer Events]
+
     C --> H[Tool/Plugin Manager]
     C --> I[Timeline Engine]
     C --> J[Log System]
-    
+
     D --> K[Google GenAI SDK]
     K --> L[Gemini Pro/Flash Model]
     K --> M[Google Search Grounding]
