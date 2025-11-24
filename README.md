@@ -25,7 +25,7 @@
 
 河图 将传统的"白板墙"调查数字化，并赋予了 AI 智能。
 
-![alt text](image.png)
+![alt text](imgs/c5c1b323-4dff-4b66-a64f-8c27af6b3760.jpeg)
 
 ### 核心特性
 
