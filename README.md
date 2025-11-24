@@ -98,7 +98,7 @@
 **1. 克隆项目**
 ```bash
 git clone https://github.com/J0hnFFFF/Hetu.git
-cd nexus-osint-platform
+cd Hetu
 ```
 
 **2. 安装依赖**
