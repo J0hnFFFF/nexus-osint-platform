@@ -1,7 +1,10 @@
 
 
-import React from 'react';
+import React, { useState } from 'react';
 import { IntelNode, NodeType } from '../types';
+import { MiniMap } from './MiniMap';
+import { MapModal } from './MapModal';
+import { MediaModal } from './MediaModal';
 import {
   User, Globe, Image as ImageIcon, FileText,
   Link2, Network, Server, MapPin, Hash, Database, AtSign, Loader2,
@@ -25,10 +28,45 @@ interface NodeCardProps {
   onContextMenu: (e: React.MouseEvent) => void;
 }
 
-export const NodeCard: React.FC<NodeCardProps> = ({ 
-  node, isSelected, onPointerDown, onStartConnect, onContextMenu 
+// Helper function to parse coordinate string
+const parseCoordinates = (value: string): { lat: number; lng: number } | null => {
+  if (!value || typeof value !== 'string') return null;
+
+  // Match patterns like "39.9042,116.4074" or "39.9042, 116.4074"
+  const match = value.trim().match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if (!match) return null;
+
+  const lat = parseFloat(match[1]);
+  const lng = parseFloat(match[2]);
+
+  // Validate coordinate ranges
+  if (isNaN(lat) || isNaN(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+  return { lat, lng };
+};
+
+// Fields that may contain coordinates
+const COORDINATE_FIELDS = ['经纬度', '坐标', 'coordinates', 'latlng', 'location'];
+
+export const NodeCard: React.FC<NodeCardProps> = ({
+  node, isSelected, onPointerDown, onStartConnect, onContextMenu
 }) => {
-  
+  const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [activeCoords, setActiveCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [activeMedia, setActiveMedia] = useState<{ src: string; type: 'image' | 'video' | 'audio'; title: string } | null>(null);
+
+  const handleOpenMap = (coords: { lat: number; lng: number }) => {
+    setActiveCoords(coords);
+    setMapModalOpen(true);
+  };
+
+  const handleOpenMedia = (src: string, type: 'image' | 'video' | 'audio', title: string) => {
+    setActiveMedia({ src, type, title });
+    setMediaModalOpen(true);
+  };
+
   const getIcon = () => {
     switch (node.type) {
       // 1. SUBJECTS
@@ -184,6 +222,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   // Filter out empty values for preview
   const populatedData = Object.entries(node.data || {}).filter(([_, v]) => String(v).trim() !== "");
 
+  // Extract coordinate field separately (to ensure it's always shown if present)
+  const coordEntry = populatedData.find(([k, v]) => {
+    const isCoordField = COORDINATE_FIELDS.some(f => k.toLowerCase().includes(f.toLowerCase()));
+    return isCoordField && parseCoordinates(String(v)) !== null;
+  });
+  const coordData = coordEntry ? parseCoordinates(String(coordEntry[1])) : null;
+
+  // Filter out coordinate field from regular display
+  const nonCoordData = coordEntry
+    ? populatedData.filter(([k]) => k !== coordEntry[0])
+    : populatedData;
+
   return (
     <div
       data-node-id={node.id}
@@ -230,16 +280,34 @@ export const NodeCard: React.FC<NodeCardProps> = ({
             {node.content}
          </div>
          
+         {/* Map Preview (shown first if coordinates exist) */}
+         {coordData && coordEntry && (
+            <div className="bg-black/20 rounded p-2 border border-white/5">
+                <div className="flex flex-col text-[9px] font-mono">
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                       <span>{coordEntry[0]}:</span>
+                       <MapPin className="w-3 h-3 text-red-500" />
+                    </div>
+                    <MiniMap
+                      lat={coordData.lat}
+                      lng={coordData.lng}
+                      label={node.title}
+                      onExpand={() => handleOpenMap(coordData)}
+                    />
+                </div>
+            </div>
+         )}
+
          {/* Key Data Points Preview (Only shown if populated) */}
-         {populatedData.length > 0 && (
+         {nonCoordData.length > 0 && (
             <div className="bg-black/20 rounded p-2 border border-white/5 space-y-1">
-                {populatedData.slice(0, 3).map(([k, v]) => {
+                {nonCoordData.slice(0, 3).map(([k, v]) => {
                    const strVal = String(v);
                    const isFile = strVal.startsWith('data:');
                    const isImage = strVal.startsWith('data:image');
                    const isVideo = strVal.startsWith('data:video');
                    const isAudio = strVal.startsWith('data:audio');
-                   
+
                    if (isFile) {
                        return (
                            <div key={k} className="flex flex-col text-[9px] font-mono mt-2 mb-1">
@@ -249,13 +317,50 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                                   {isVideo && <Video className="w-3 h-3" />}
                                   {isAudio && <Music className="w-3 h-3" />}
                                </div>
-                               
+
                                {isImage ? (
-                                   <img src={strVal} className="w-full h-32 object-cover rounded border border-slate-700" alt="evidence" />
+                                   <div
+                                     className="relative group cursor-pointer"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleOpenMedia(strVal, 'image', `${node.title} - ${k}`);
+                                     }}
+                                     onPointerDown={(e) => e.stopPropagation()}
+                                   >
+                                     <img src={strVal} className="w-full h-32 object-cover rounded border border-slate-700" alt="evidence" />
+                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                       <span className="opacity-0 group-hover:opacity-100 text-white text-[10px] bg-slate-900/80 px-2 py-1 rounded">点击放大</span>
+                                     </div>
+                                   </div>
                                ) : isVideo ? (
-                                   <video controls muted className="w-full rounded border border-slate-700 bg-black" src={strVal} />
+                                   <div
+                                     className="relative group cursor-pointer"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleOpenMedia(strVal, 'video', `${node.title} - ${k}`);
+                                     }}
+                                     onPointerDown={(e) => e.stopPropagation()}
+                                   >
+                                     <video muted className="w-full rounded border border-slate-700 bg-black pointer-events-none" src={strVal} />
+                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                       <span className="opacity-0 group-hover:opacity-100 text-white text-[10px] bg-slate-900/80 px-2 py-1 rounded">点击播放</span>
+                                     </div>
+                                   </div>
                                ) : isAudio ? (
-                                   <audio controls className="w-full h-6 mt-1" src={strVal} />
+                                   <div
+                                     className="relative group cursor-pointer"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       handleOpenMedia(strVal, 'audio', `${node.title} - ${k}`);
+                                     }}
+                                     onPointerDown={(e) => e.stopPropagation()}
+                                   >
+                                     <div className="flex items-center gap-2 p-2 bg-slate-900 rounded border border-slate-800">
+                                       <Music className="w-4 h-4 text-pink-400" />
+                                       <span className="text-slate-400">音频文件</span>
+                                       <span className="text-cyan-500 text-[10px] ml-auto">点击播放</span>
+                                     </div>
+                                   </div>
                                ) : (
                                    <div className="flex items-center gap-1 text-cyan-500 p-1 bg-slate-900 rounded border border-slate-800">
                                        <Paperclip className="w-3 h-3" /> <span className="italic">Binary File</span>
@@ -286,6 +391,29 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                {node.rating.reliability}{node.rating.credibility}
            </span>
         </div>
+      )}
+
+      {/* Map Modal */}
+      {activeCoords && (
+        <MapModal
+          isOpen={mapModalOpen}
+          onClose={() => setMapModalOpen(false)}
+          lat={activeCoords.lat}
+          lng={activeCoords.lng}
+          title={node.title}
+          address={node.data?.['详细地址'] as string}
+        />
+      )}
+
+      {/* Media Modal */}
+      {activeMedia && (
+        <MediaModal
+          isOpen={mediaModalOpen}
+          onClose={() => setMediaModalOpen(false)}
+          src={activeMedia.src}
+          type={activeMedia.type}
+          title={activeMedia.title}
+        />
       )}
     </div>
   );

@@ -1,8 +1,8 @@
 
-# 河图情报分析系统 v5.3.0
+# 河图情报分析系统 v5.4.0
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-5.3-blue)
+![Version](https://img.shields.io/badge/Version-5.4-blue)
 ![Tech](https://img.shields.io/badge/Tech-React19%20%7C%20Gemini%20AI%20%7C%20Tailwind-0ea5e9)
 ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20macOS-lightgrey)
 
@@ -34,6 +34,8 @@
 - 一键自动布局复杂关系网络
 - 全局搜索与实体高亮
 - 实时系统日志跟踪所有操作
+- **地图视图**: 地理位置节点自动显示交互式地图 (Leaflet/OpenStreetMap)
+- **媒体预览**: 图片/视频/音频点击放大查看，支持缩放、旋转、下载
 
 **多维实体支持 (110+ 类型)**
 - **主体实体**: 人员、组织、威胁行为者、军事单位、政府机构
@@ -227,7 +229,49 @@ npm run electron:build
 - 或更新节点属性字段
 - 查看"系统日志"了解详细执行信息
 
-### 4.4 高级功能
+### 4.4 地图视图
+
+支持地理位置的可视化展示，任何包含「经纬度」字段的节点会自动显示交互式地图。
+
+**使用方式**
+1. 创建「地理位置」节点（资产库 → 物理监控 → 地理位置）
+2. 在「经纬度」字段填入坐标，格式：`纬度,经度`（例：`39.9042,116.4074`）
+3. 节点卡片自动显示小地图预览
+4. 点击小地图打开大地图弹窗
+
+**大地图功能**
+- 拖拽平移、滚轮缩放
+- 街道/卫星底图切换
+- 复制坐标到剪贴板
+- 打开 Google Maps 导航
+
+**支持的节点类型**
+- 地理位置 (GEO_LOCATION)
+- 设施场所 (FACILITY)
+- 酒店住宿 (HOTEL)
+- 以及任何包含「经纬度」「坐标」字段的节点
+
+### 4.5 媒体预览
+
+图片、视频、音频文件支持点击放大查看。
+
+**图片查看器**
+- 点击缩略图打开全屏查看
+- 缩放功能 (25% - 300%)
+- 旋转功能 (90° 步进)
+- 下载原文件
+
+**视频播放器**
+- 点击预览打开全屏播放
+- 自动播放、播放控制
+- 下载视频文件
+
+**音频播放器**
+- 点击打开播放面板
+- 自动播放
+- 下载音频文件
+
+### 4.6 高级功能
 
 **自定义工具**
 1. 资产库 → 点击 `+ 新建插件`
@@ -246,7 +290,7 @@ npm run electron:build
 - 导入：资产库 → 点击上传图标 → 选择 JSON/TXT 文件
 - 导出：时间线 → 生成情报简报 → 下载 TXT
 
-### 4.5 数据保存与加载
+### 4.7 数据保存与加载
 
 **保存图谱**
 1. 点击顶部工具栏的「保存」按钮
@@ -362,6 +406,7 @@ Canvas 重新渲染
 - **Styling**: Tailwind CSS
 - **AI SDK**: `@google/genai`
 - **Storage**: `idb` (IndexedDB 封装)
+- **Maps**: `leaflet` + `react-leaflet` (OpenStreetMap)
 - **Icons**: `lucide-react`
 - **Build Tool**: Vite
 - **Desktop**: Electron + electron-builder
@@ -530,7 +575,10 @@ nexus-osint-platform/
 │   │   ├── Canvas.tsx             # 无限画布引擎
 │   │   ├── NodeCard.tsx           # 节点卡片组件
 │   │   ├── ControlPanel.tsx       # 右侧控制面板
-│   │   └── ContextMenu.tsx        # 右键菜单
+│   │   ├── ContextMenu.tsx        # 右键菜单
+│   │   ├── MiniMap.tsx            # 小地图预览组件
+│   │   ├── MapModal.tsx           # 大地图弹窗组件
+│   │   └── MediaModal.tsx         # 媒体预览弹窗组件
 │   └── services/
 │       ├── geminiService.ts       # AI 服务层
 │       └── storageService.ts      # 本地持久化服务 (IndexedDB)
@@ -576,6 +624,8 @@ A:
 - [x] Search Grounding 支持
 - [x] 桌面应用打包
 - [x] 本地数据持久化（IndexedDB）
+- [x] 地图视图 (Leaflet/OpenStreetMap)
+- [x] 媒体预览 (图片/视频/音频放大查看)
 - [ ] 多画布工作区
 - [ ] 团队协作功能
 - [ ] 插件市场

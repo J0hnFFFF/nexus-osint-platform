@@ -987,6 +987,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <EntityCategory
               title="物理监控 (Physical)"
               items={[
+                {t: NodeType.GEO_LOCATION, l: '地理位置', Icon: MapPin},
+                {t: NodeType.FACILITY, l: '设施场所', Icon: Building2},
+                {t: NodeType.VEHICLE, l: '车辆', Icon: Car},
                 {t: NodeType.LICENSE_PLATE, l: '车牌号', Icon: Car},
                 {t: NodeType.BIOMETRIC, l: '生物识别', Icon: Fingerprint},
                 {t: NodeType.CCTV_FOOTAGE, l: '监控录像', Icon: Camera},
