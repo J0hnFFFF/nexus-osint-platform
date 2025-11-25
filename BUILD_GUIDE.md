@@ -103,7 +103,7 @@ app.on('activate', () => {
 ```json
 {
   "name": "nexus-osint-platform",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "main": "electron.js", 
   ...
 }
@@ -199,9 +199,9 @@ npm run electron:build
 ```
 
 构建完成后，安装包将生成在项目的 `release` 文件夹中：
-*   **Windows**: `Hetu OSINT Setup 5.2.0.exe`
-*   **macOS**: `Hetu OSINT-5.2.0.dmg`
-*   **Linux**: `Hetu OSINT-5.2.0.AppImage`
+*   **Windows**: `Hetu OSINT Setup 5.3.0.exe`
+*   **macOS**: `Hetu OSINT-5.3.0.dmg`
+*   **Linux**: `Hetu OSINT-5.3.0.AppImage`
 
 ---
 

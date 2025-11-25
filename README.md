@@ -2,7 +2,7 @@
 # 河图情报分析系统
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-5.2-blue)
+![Version](https://img.shields.io/badge/Version-5.3-blue)
 ![Tech](https://img.shields.io/badge/Tech-React19%20%7C%20Gemini%20AI%20%7C%20Tailwind-0ea5e9)
 ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20macOS-lightgrey)
 
