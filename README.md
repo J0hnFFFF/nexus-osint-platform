@@ -1,8 +1,8 @@
 
-# 河图情报分析系统 v5.5.0
+# 河图情报分析系统 v5.6.0
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
-![Version](https://img.shields.io/badge/Version-5.5-blue)
+![Version](https://img.shields.io/badge/Version-5.6-blue)
 ![Tech](https://img.shields.io/badge/Tech-React19%20%7C%20Gemini%20AI%20%7C%20Tailwind-0ea5e9)
 ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Windows%20%7C%20macOS-lightgrey)
 
@@ -59,7 +59,7 @@
 - 自动化实体关系发现
 
 
-**情报搜集工具箱 (44+ 工具)**
+**情报搜集工具箱 (59 工具)**
 
 *AGENT 类* - 纯 AI 推理分析
 - 心理侧写分析、代码安全审计、多语言翻译
@@ -70,7 +70,8 @@
 - **威胁情报**: IP 信誉检测 (AbuseIPDB)、URL 威胁扫描 (URLScan)、威胁脉冲 (AlienVault OTX)
 - **区块链**: 多链追踪 (Blockchain Explorer)、NFT 持有分析 (OpenSea)
 - **社交媒体**: X/Twitter 深度情报、Discord 社区情报、LinkedIn 履历
-- **网络资产**: GitHub 代码仓库、Whois 查询、子域名枚举、DNS 记录
+- **新媒体**: 博客深度调查、播客情报分析、直播间调查、论坛帖子溯源
+- **网络资产**: GitHub 代码仓库、Whois 查询、子域名枚举、DNS 解析、企业邮箱挖掘
 - **企业情报**: 企业关系网 (Corporate Tree)、工商信息查询
 - **物理世界**: 船舶追踪 (AIS)、航班跟踪、地理位置 OSINT
 - **专业情报**: 漏洞数据库 (CVE)、暗网监控、泄露数据库搜索
@@ -80,8 +81,9 @@
 
 **决策辅助**
 - 自动生成事件时间线
-- AI 驱动的情报简报生成
-- **专业 PDF 导出**: 情报简报一键导出为格式化 PDF 文档
+- **智能情报简报**: AI 驱动的简报生成，支持选中节点分析或全画布分析
+- **图谱分析集成**: 简报自动整合社区发现和核心节点识别结果
+- **Markdown 导出**: 情报简报一键导出为 Markdown 文档
 - NATO 海军部编码系统评级 (可靠性 A-F / 可信度 1-6)
 - 完整的操作日志系统
 
@@ -633,8 +635,7 @@ nexus-osint-platform/
 │   └── services/
 │       ├── geminiService.ts       # AI 服务层
 │       ├── storageService.ts      # 本地持久化服务 (IndexedDB)
-│       ├── graphAnalysis.ts       # 图谱分析服务 (社区发现/核心节点)
-│       └── pdfExportService.ts    # PDF 导出服务
+│       └── graphAnalysis.ts       # 图谱分析服务 (社区发现/核心节点)
 ├── public/                        # 静态资源
 ├── BUILD_GUIDE.md                 # Electron 打包指南
 ├── vite.config.ts                 # Vite 构建配置

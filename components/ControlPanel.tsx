@@ -14,8 +14,6 @@ import {
 } from 'lucide-react';
 import { NodeType, IntelNode, Tool, LogEntry, ToolCategory, AIModelConfig } from '../types';
 import { ENTITY_DEFAULT_FIELDS, AI_MODELS } from '../constants';
-import { generateFinalReport } from '../services/geminiService';
-import { generateBriefingPDF } from '../services/pdfExportService';
 
 interface ControlPanelProps {
   selectedNodes: IntelNode[];
@@ -54,8 +52,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'inspector' | 'plugins' | 'timeline' | 'logs' | 'settings'>('plugins');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [reportText, setReportText] = useState('');
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   // API Key Management
   const [apiKey, setApiKey] = useState<string>('');
@@ -191,20 +187,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     onSaveTool(toolToSave);
     onLog(`创建新工具: ${toolToSave.name}`, 'success');
     setIsCreatingTool(false);
-  };
-
-  const handleGenerateReport = async () => {
-      setIsGeneratingReport(true);
-      onLog("正在通过 AI 生成情报简报...", 'info');
-      try {
-          const report = await generateFinalReport(allNodes, "Senior Intelligence Analyst");
-          setReportText(report);
-          onLog("情报简报生成成功", 'success');
-      } catch (e) {
-          setReportText("生成报告失败，请重试。");
-          onLog("情报简报生成失败", 'error');
-      }
-      setIsGeneratingReport(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -589,62 +571,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                 )}
             </div>
-
-            {/* Report Generation Area */}
-            <div className="border-t border-slate-800 bg-slate-900/20 p-3">
-                <button
-                    onClick={handleGenerateReport}
-                    disabled={isGeneratingReport}
-                    className="w-full py-2 bg-gradient-to-r from-cyan-900 to-blue-900 hover:from-cyan-800 hover:to-blue-800 border border-cyan-800 text-cyan-100 rounded text-xs font-bold flex items-center justify-center gap-2 shadow-lg"
-                >
-                    {isGeneratingReport ? <RefreshCw className="w-3 h-3 animate-spin"/> : <FileOutput className="w-3 h-3" />}
-                    {isGeneratingReport ? 'AI 撰写中...' : '生成情报简报 (Briefing)'}
-                </button>
-            </div>
-            
-            {reportText && (
-                <div className="absolute inset-0 bg-slate-950 z-20 flex flex-col animate-in slide-in-from-bottom-5">
-                    <div className="flex justify-between items-center p-3 border-b border-slate-800 bg-slate-900">
-                        <span className="font-bold text-slate-200 text-xs flex items-center gap-2">
-                           <FileText className="w-4 h-4 text-cyan-400"/> 情报简报预览
-                        </span>
-                        <button onClick={() => setReportText('')} className="text-slate-500 hover:text-white"><X className="w-4 h-4"/></button>
-                    </div>
-                    <div className="flex-1 p-4 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
-                        {reportText}
-                    </div>
-                    <div className="p-3 border-t border-slate-800 flex justify-end gap-2">
-                        <button
-                            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs flex items-center gap-1 transition-colors"
-                            onClick={() => {
-                                const blob = new Blob([reportText], {type: 'text/plain'});
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `Intel_Briefing_${new Date().toISOString().split('T')[0]}.txt`;
-                                a.click();
-                            }}
-                        >
-                            <FileText className="w-3 h-3" />
-                            下载 .TXT
-                        </button>
-                        <button
-                            className="px-3 py-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded text-xs flex items-center gap-1 transition-colors shadow-lg"
-                            onClick={() => {
-                                try {
-                                    generateBriefingPDF(reportText, '情报简报 (Intelligence Briefing)');
-                                    onLog('PDF 简报导出成功', 'success');
-                                } catch (err) {
-                                    onLog(`PDF 导出失败: ${err}`, 'error');
-                                }
-                            }}
-                        >
-                            <FileOutput className="w-3 h-3" />
-                            下载 .PDF
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
   }
@@ -877,14 +803,14 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <Shield className="w-4 h-4 text-cyan-400" /> 资产 & 工具库
              </span>
              <div className="flex gap-2">
-                 <button 
+                 <button
                     onClick={() => fileInputRef.current?.click()}
                     className="p-1.5 text-slate-500 hover:text-cyan-400 border border-transparent hover:border-cyan-900 rounded transition-colors"
                     title="导入数据"
                  >
                     <Upload className="w-3.5 h-3.5" />
                  </button>
-                 <button 
+                 <button
                     onClick={() => setIsCreatingTool(true)}
                     className="p-1.5 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 rounded border border-cyan-900/50 transition-colors"
                     title="创建自定义工具"
@@ -1275,7 +1201,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div className="p-2 bg-slate-950 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
          <div className="flex items-center gap-2">
-             <span>OSINT Kernel v5.3</span>
+             <span>OSINT Kernel v5.6</span>
              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
                  {aiConfig.modelId.includes('flash') ? 'FLASH' : 'PRO'}
              </span>

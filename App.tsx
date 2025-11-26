@@ -5,11 +5,11 @@ import { ControlPanel } from './components/ControlPanel';
 import { ContextMenu } from './components/ContextMenu';
 import { TrajectoryModal, extractTrajectoryPoints } from './components/TrajectoryModal';
 import { IntelNode, Connection, NodeType, Position, LogEntry, Tool, AIModelConfig } from './types';
-import { executeTool } from './services/geminiService';
+import { executeTool, generateFinalReport, BriefingContext } from './services/geminiService';
 import { analyzeGraph, GraphAnalysisResult } from './services/graphAnalysis';
 import { ENTITY_DEFAULT_FIELDS } from './constants';
 import { DEFAULT_TOOLS } from './tools';
-import { Search, Layout, Save, FolderOpen, Network } from 'lucide-react';
+import { Search, Layout, Save, FolderOpen, Network, Trash2, FileText, X, FileOutput, RefreshCw } from 'lucide-react';
 import {
   saveAIConfig,
   loadAIConfig,
@@ -54,6 +54,11 @@ const App: React.FC = () => {
 
   // Graph Analysis State (Community Detection & Key Nodes)
   const [graphAnalysis, setGraphAnalysis] = useState<GraphAnalysisResult | null>(null);
+
+  // Briefing Report State
+  const [reportText, setReportText] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Persistence State
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -171,6 +176,101 @@ const App: React.FC = () => {
     }
     setContextMenu(null);
   }, [addLog]);
+
+  const clearAllNodes = useCallback(() => {
+    const nodeCount = nodesRef.current.length;
+    if (nodeCount === 0) {
+      addLog('画布已为空，无需清空', 'info');
+      return;
+    }
+    setNodes([]);
+    setConnections([]);
+    setSelectedNodeIds([]);
+    setContextMenu(null);
+    addLog(`🗑️ 已清空全部 ${nodeCount} 个节点`, 'warning');
+  }, [addLog]);
+
+  // Generate Briefing Report
+  const handleGenerateBriefing = useCallback(async () => {
+    // 智能选择：有选中节点则只分析选中的，否则分析全部
+    const targetNodes = selectedNodeIds.length > 0
+      ? nodesRef.current.filter(n => selectedNodeIds.includes(n.id))
+      : nodesRef.current;
+
+    if (targetNodes.length === 0) {
+      addLog('画布中没有可分析的节点', 'warning');
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    setShowReportModal(true);
+    setReportText('');
+
+    const scope = selectedNodeIds.length > 0
+      ? `选中的 ${targetNodes.length} 个节点`
+      : `全部 ${targetNodes.length} 个节点`;
+    addLog(`📝 正在生成情报简报 (${scope})...`, 'info');
+
+    try {
+      // 获取目标节点的 ID 集合
+      const targetNodeIds = new Set(targetNodes.map(n => n.id));
+
+      // 筛选相关连接（只保留两端都在目标节点中的连接）
+      const relevantConnections = connections.filter(
+        c => targetNodeIds.has(c.sourceId) && targetNodeIds.has(c.targetId)
+      );
+
+      // 构建连接信息（带标题）
+      const connectionInfo = relevantConnections.map(c => {
+        const source = targetNodes.find(n => n.id === c.sourceId);
+        const target = targetNodes.find(n => n.id === c.targetId);
+        return {
+          sourceTitle: source?.title || '未知',
+          targetTitle: target?.title || '未知'
+        };
+      });
+
+      // 执行图谱分析
+      const analysis = analyzeGraph(targetNodes, relevantConnections);
+
+      // 构建社区信息
+      const communitiesMap = new Map<number, string[]>();
+      analysis.communities.forEach((communityId, nodeId) => {
+        const node = targetNodes.find(n => n.id === nodeId);
+        if (node) {
+          if (!communitiesMap.has(communityId)) {
+            communitiesMap.set(communityId, []);
+          }
+          communitiesMap.get(communityId)!.push(node.title);
+        }
+      });
+      const communities = Array.from(communitiesMap.entries()).map(([id, members]) => ({
+        id,
+        members
+      }));
+
+      // 获取核心节点标题
+      const keyNodeTitles = analysis.keyNodes
+        .map(id => targetNodes.find(n => n.id === id)?.title)
+        .filter(Boolean) as string[];
+
+      // 构建简报上下文
+      const briefingContext: BriefingContext = {
+        nodes: targetNodes,
+        connections: connectionInfo,
+        communities: communities.length > 1 ? communities : undefined,
+        keyNodes: keyNodeTitles.length > 0 ? keyNodeTitles : undefined
+      };
+
+      const report = await generateFinalReport(briefingContext);
+      setReportText(report);
+      addLog('✅ 情报简报生成成功', 'success');
+    } catch (e) {
+      setReportText('生成报告失败，请重试。');
+      addLog('❌ 情报简报生成失败', 'error');
+    }
+    setIsGeneratingReport(false);
+  }, [selectedNodeIds, connections, addLog]);
 
   // Keyboard listener for deletion
   useEffect(() => {
@@ -386,7 +486,7 @@ const App: React.FC = () => {
       addLog(`✓ 批量执行完成 [${tool.name}]`, 'success');
     }
 
-    setTimeout(performAutoLayout, 100);
+    // 不再自动重排所有节点，新节点位置已在 runToolOnNode 中计算（相对于源节点往右排列）
     setIsProcessing(false);
   };
 
@@ -492,6 +592,38 @@ const App: React.FC = () => {
           </button>
 
           <button
+              onClick={() => {
+                if (nodes.length === 0) return;
+                if (window.confirm(`确定要清空全部 ${nodes.length} 个节点吗？此操作不可撤销。`)) {
+                  clearAllNodes();
+                }
+              }}
+              title="清空全部节点 / Clear All"
+              className="bg-slate-900/90 backdrop-blur border border-slate-700 hover:border-red-500 rounded shadow-lg h-[50px] w-[50px] flex items-center justify-center transition-all hover:bg-red-900/20 group"
+          >
+              <Trash2 className="w-5 h-5 text-slate-400 group-hover:text-red-400 transition-colors" />
+          </button>
+
+          <button
+              onClick={handleGenerateBriefing}
+              disabled={isGeneratingReport || nodes.length === 0}
+              title={selectedNodeIds.length > 0 ? `生成简报 (${selectedNodeIds.length} 个选中节点)` : "生成简报 (全部节点)"}
+              className={`bg-slate-900/90 backdrop-blur border rounded shadow-lg h-[50px] px-4 flex items-center justify-center gap-2 transition-all group ${
+                isGeneratingReport
+                  ? 'border-amber-500 bg-amber-900/20'
+                  : 'border-slate-700 hover:border-amber-500 hover:bg-amber-900/20'
+              } ${nodes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+              {isGeneratingReport
+                ? <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+                : <FileText className="w-4 h-4 text-slate-400 group-hover:text-amber-400 transition-colors" />
+              }
+              <span className={`text-xs transition-colors ${isGeneratingReport ? 'text-amber-400' : 'text-slate-400 group-hover:text-amber-400'}`}>
+                {isGeneratingReport ? '生成中...' : (selectedNodeIds.length > 0 ? `简报(${selectedNodeIds.length})` : '简报')}
+              </span>
+          </button>
+
+          <button
               onClick={handleAnalyzeGraph}
               title="分析网络 / Analyze Network (社区发现 & 核心人物)"
               className={`bg-slate-900/90 backdrop-blur border rounded shadow-lg h-[50px] px-4 flex items-center justify-center gap-2 transition-all group ${
@@ -585,6 +717,73 @@ const App: React.FC = () => {
          onUpdateAiConfig={handleUpdateAiConfig}
          onLog={addLog}
        />
+
+       {/* Briefing Report Modal */}
+       {showReportModal && (
+         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+           <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+             {/* Header */}
+             <div className="flex justify-between items-center p-4 border-b border-slate-700">
+               <span className="font-bold text-slate-200 flex items-center gap-2">
+                 <FileText className="w-5 h-5 text-amber-400" />
+                 情报简报 (Intelligence Briefing)
+               </span>
+               <button
+                 onClick={() => setShowReportModal(false)}
+                 className="text-slate-400 hover:text-white transition-colors"
+               >
+                 <X className="w-5 h-5" />
+               </button>
+             </div>
+
+             {/* Content */}
+             <div className="flex-1 p-6 overflow-y-auto">
+               {isGeneratingReport ? (
+                 <div className="flex flex-col items-center justify-center h-64 gap-4">
+                   <RefreshCw className="w-8 h-8 text-amber-400 animate-spin" />
+                   <span className="text-slate-400">AI 正在撰写情报简报...</span>
+                 </div>
+               ) : (
+                 <div className="font-mono text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                   {reportText}
+                 </div>
+               )}
+             </div>
+
+             {/* Footer */}
+             {!isGeneratingReport && reportText && (
+               <div className="p-4 border-t border-slate-700 flex justify-end gap-3">
+                 <button
+                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 transition-colors"
+                   onClick={() => {
+                     navigator.clipboard.writeText(reportText);
+                     addLog('📋 简报已复制到剪贴板', 'success');
+                   }}
+                 >
+                   <FileText className="w-4 h-4" />
+                   复制内容
+                 </button>
+                 <button
+                   className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded text-sm flex items-center gap-2 transition-colors shadow-lg"
+                   onClick={() => {
+                     const blob = new Blob([reportText], { type: 'text/markdown' });
+                     const url = URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = `情报简报_${new Date().toISOString().split('T')[0]}.md`;
+                     a.click();
+                     URL.revokeObjectURL(url);
+                     addLog('📝 Markdown 简报已下载', 'success');
+                   }}
+                 >
+                   <FileOutput className="w-4 h-4" />
+                   下载 .MD
+                 </button>
+               </div>
+             )}
+           </div>
+         </div>
+       )}
 
        {/* Trajectory Analysis Modal */}
        {trajectoryModal.isOpen && trajectoryModal.nodeId && (() => {

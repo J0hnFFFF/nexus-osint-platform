@@ -355,22 +355,99 @@ CRITICAL: Your response MUST be valid JSON with this exact structure:
   }
 };
 
-export const generateFinalReport = async (nodes: IntelNode[], persona: string): Promise<string> => {
+export interface BriefingContext {
+    nodes: IntelNode[];
+    connections: { sourceTitle: string; targetTitle: string; label?: string }[];
+    communities?: { id: number; members: string[] }[];
+    keyNodes?: string[];
+}
+
+export const generateFinalReport = async (context: BriefingContext): Promise<string> => {
     const ai = await getAI();
-    const context = nodes.map(n => {
+
+    // 1. 构建实体列表
+    const entityList = context.nodes.map(n => {
         const safeData = { ...n.data };
         for (const key in safeData) {
             const value = safeData[key];
             if (typeof value === 'string' && value.startsWith('data:')) {
-                safeData[key] = '[MEDIA_ATTACHMENT]';
+                safeData[key] = '[附件]';
             }
         }
-        return `[${n.type}] ${n.title}\nInfo: ${n.content}\nData: ${JSON.stringify(safeData)}`;
-    }).join('\n---\n');
-    
+        const dataStr = Object.entries(safeData)
+            .filter(([_, v]) => v && String(v).trim())
+            .map(([k, v]) => `${k}: ${v}`)
+            .join('; ');
+        return `- **${n.title}** [${n.type}]: ${n.content || '无描述'}${dataStr ? ` | 属性: ${dataStr}` : ''}`;
+    }).join('\n');
+
+    // 2. 构建关系列表
+    const relationList = context.connections.length > 0
+        ? context.connections.map(c => `- ${c.sourceTitle} → ${c.targetTitle}${c.label ? ` (${c.label})` : ''}`).join('\n')
+        : '无已建立的关系连接';
+
+    // 3. 构建社区信息
+    const communityInfo = context.communities && context.communities.length > 0
+        ? context.communities.map(c => `- 社区 ${c.id + 1}: ${c.members.join(', ')}`).join('\n')
+        : '未进行社区分析';
+
+    // 4. 核心节点
+    const keyNodesInfo = context.keyNodes && context.keyNodes.length > 0
+        ? context.keyNodes.join(', ')
+        : '未识别核心节点';
+
+    const prompt = `你是一名资深情报分析师。请根据以下**画布中的实际数据**撰写一份情报简报。
+
+## 严格要求
+1. **只能使用下方提供的数据**，禁止编造、推测或添加任何不存在的信息
+2. 如果某方面信息不足，直接说明"信息不足"，不要虚构
+3. 输出格式为 **Markdown**
+4. 使用中文撰写
+
+## 画布数据
+
+### 实体清单 (共 ${context.nodes.length} 个)
+${entityList}
+
+### 关系网络 (共 ${context.connections.length} 条连接)
+${relationList}
+
+### 社区结构
+${communityInfo}
+
+### 核心节点
+${keyNodesInfo}
+
+## 简报结构要求
+请按以下结构输出：
+
+# 情报简报
+
+## 一、概述
+(简要说明本次分析涉及的实体数量、类型分布、主要关注点)
+
+## 二、核心发现
+(列出 3-5 个基于数据的关键发现，每条必须有数据支撑)
+
+## 三、实体分析
+(按重要性或类型分组描述关键实体)
+
+## 四、关系网络
+(描述已建立的关系连接，分析网络结构特点)
+
+## 五、风险评估
+(基于现有数据的风险判断，信息不足时明确标注)
+
+## 六、情报空白
+(指出当前数据中缺失但需要补充的信息)
+
+---
+*本简报基于画布中 ${context.nodes.length} 个实体和 ${context.connections.length} 条关系生成*
+`;
+
     const res = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Generate a professional intelligence report in Chinese based on these entities. Persona: ${persona}.\n\nData:\n${context}`
+        contents: prompt
     });
     return res.text || "生成失败";
 }

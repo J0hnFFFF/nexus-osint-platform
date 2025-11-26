@@ -321,6 +321,41 @@ export const DEFAULT_TOOLS: Tool[] = [
     isSimulated: false
   },
   {
+    id: 'mcp_dns_resolve',
+    category: ToolCategory.MCP,
+    name: '域名DNS解析 (Live)',
+    version: 'Live',
+    author: 'OSINT',
+    description: '【真实】解析域名的DNS记录，获取关联IP地址。',
+    targetTypes: [NodeType.DOMAIN],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `搜索该域名的DNS解析记录信息。
+
+查询内容：
+1. **A记录** - 域名指向的IPv4地址
+2. **AAAA记录** - 域名指向的IPv6地址
+3. **MX记录** - 邮件服务器地址
+4. **NS记录** - 域名服务器
+5. **TXT记录** - SPF、DKIM等验证信息
+6. **CNAME记录** - 别名指向
+
+搜索方法：
+- site:dnschecker.org "域名"
+- site:mxtoolbox.com "域名"
+- "域名" DNS records A AAAA MX
+- site:securitytrails.com "域名"
+
+为发现的每个IP地址创建 IP_ADDRESS 类型节点，包含：
+- IP地址
+- 记录类型（A/AAAA/MX等）
+- 地理位置（如果能确定）
+- 所属ISP/托管商
+
+同时更新原域名节点的 NameServer 属性。`,
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
     id: 'mcp_google_maps_lookup',
     category: ToolCategory.MCP,
     name: '地理侦察 (Maps)',
@@ -345,6 +380,37 @@ export const DEFAULT_TOOLS: Tool[] = [
     targetTypes: [NodeType.ORGANIZATION],
     mcpConfig: { functionName: 'googleSearch' },
     promptTemplate: "搜索该公司的工商注册信息、LinkedIn 页面和相关新闻。\n1. 确认总部所在地。\n2. 寻找主要高管姓名。\n3. 检查是否有涉诉或诈骗指控。",
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
+    id: 'mcp_company_email',
+    category: ToolCategory.MCP,
+    name: '企业邮箱挖掘 (Live)',
+    version: 'Live',
+    author: 'OSINT',
+    description: '【真实】搜索企业关联的邮箱地址、邮箱格式。',
+    targetTypes: [NodeType.ORGANIZATION],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `搜索该企业相关的邮箱地址信息。
+
+查询维度：
+1. **官方联系邮箱** - 官网公开的客服、商务、招聘等邮箱
+2. **邮箱命名格式** - 该公司的邮箱命名规则（如 firstname.lastname@company.com）
+3. **高管邮箱** - CEO、CFO、CTO等高管的公开邮箱
+4. **部门邮箱** - 销售、技术支持、法务等部门邮箱
+5. **历史泄露** - 是否在数据泄露事件中出现过该公司邮箱
+
+搜索方法：
+- site:linkedin.com "@公司域名"
+- site:hunter.io "公司名称"
+- "公司名称" email contact
+- "@公司域名" filetype:pdf
+
+为每个发现的邮箱地址创建 EMAIL 类型节点，包含：
+- 邮箱地址
+- 关联人员/部门
+- 来源渠道`,
     autoExpand: true,
     isSimulated: false
   },
@@ -1154,6 +1220,262 @@ export const DEFAULT_TOOLS: Tool[] = [
 - 社区影响力评估
 - Web3身份画像`,
     autoExpand: true,
+    isSimulated: false
+  },
+
+  // ============================================
+  // SECTION: NEW MEDIA TOOLS (新媒体工具)
+  // ============================================
+  {
+    id: 'mcp_blog_analysis',
+    category: ToolCategory.MCP,
+    name: '博客深度调查 (Live)',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【博客】分析博客作者身份、内容主题、关联社交账号及影响力评估。',
+    targetTypes: [NodeType.BLOG],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `对博客进行深度调查：
+
+目标博客：{{title}}
+已知信息：
+- URL: {{data.URL}}
+- 平台: {{data.平台}}
+- 作者: {{data.作者}}
+
+调查方向：
+1. 博主身份验证
+   - 搜索作者名字关联的其他账号
+   - 查找作者真实身份线索
+   - 分析写作风格和专业领域
+
+2. 内容分析
+   - 主要话题和立场
+   - 发布频率和活跃时间
+   - 是否有商业合作或赞助
+
+3. 影响力评估
+   - 被引用或转载情况
+   - 评论互动质量
+   - 在相关领域的权威性
+
+4. 关联账号发现
+   - 搜索作者在其他平台的账号
+   - 关联的社交媒体
+   - 邮箱或联系方式
+
+创建实体：
+- 发现真实身份创建 ENTITY 节点
+- 关联社交账号创建 SOCIAL_PROFILE 节点
+- 发现邮箱创建 EMAIL 节点
+- 关联组织创建 ORGANIZATION 节点
+
+输出格式：
+提供博客画像摘要，包括作者背景、内容定位、影响力评级。`,
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
+    id: 'mcp_podcast_analysis',
+    category: ToolCategory.MCP,
+    name: '播客情报分析 (Live)',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【播客】分析播客主播身份、嘉宾网络、话题倾向及传播影响力。',
+    targetTypes: [NodeType.PODCAST],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `对播客进行情报分析：
+
+目标播客：{{title}}
+已知信息：
+- 主播: {{data.主播}}
+- 平台: {{data.平台}}
+- RSS: {{data.RSS订阅}}
+
+调查任务：
+1. 主播背景调查
+   - 主播真实身份和职业背景
+   - 历史从业经历
+   - 社交媒体账号
+
+2. 嘉宾网络分析
+   - 搜索该播客的重要嘉宾
+   - 嘉宾的背景和影响力
+   - 嘉宾之间的关联
+
+3. 内容倾向分析
+   - 主要讨论话题
+   - 政治或商业立场
+   - 是否有赞助商
+
+4. 传播影响力
+   - 各平台收听数据
+   - 社交媒体讨论度
+   - 被主流媒体引用情况
+
+创建实体：
+- 主播创建 ENTITY 节点
+- 重要嘉宾创建 ENTITY 节点
+- 赞助商创建 ORGANIZATION 节点
+- 关联社交账号创建 SOCIAL_PROFILE 节点
+
+关系标注：
+- "主持"、"嘉宾出席"、"赞助"、"所属"`,
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
+    id: 'mcp_livestream_analysis',
+    category: ToolCategory.MCP,
+    name: '直播间调查 (Live)',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【直播】调查主播身份、打赏金主、直播内容及潜在违规行为。',
+    targetTypes: [NodeType.LIVESTREAM],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `对直播间进行深度调查：
+
+目标直播：{{title}}
+已知信息：
+- 平台: {{data.平台}}
+- 主播ID: {{data.主播ID}}
+- 直播URL: {{data.直播URL}}
+
+调查方向：
+1. 主播身份调查
+   - 搜索主播ID关联的真实身份
+   - 历史直播记录和争议事件
+   - 其他平台账号
+
+2. 直播内容分析
+   - 直播类型和主要内容
+   - 是否涉及敏感话题
+   - 商业推广和带货情况
+
+3. 粉丝和金主分析
+   - 大额打赏者信息
+   - 粉丝群体特征
+   - 是否有组织化打赏行为
+
+4. 风险识别
+   - 历史违规或封禁记录
+   - 涉及的争议事件
+   - 关联的灰色产业
+
+创建实体：
+- 主播真实身份创建 ENTITY 节点
+- 关联公司创建 ORGANIZATION 节点
+- 重要金主创建 ENTITY 节点
+- 其他平台账号创建 SOCIAL_PROFILE 节点
+
+输出格式：
+提供直播间风险评估报告，包括主播画像、内容合规性、资金流向分析。`,
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
+    id: 'mcp_forum_analysis',
+    category: ToolCategory.MCP,
+    name: '论坛帖子溯源 (Live)',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【论坛】分析发帖人身份、帖子传播路径、讨论参与者及舆情影响。',
+    targetTypes: [NodeType.FORUM_POST],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `对论坛帖子进行溯源分析：
+
+目标帖子：{{title}}
+已知信息：
+- 论坛: {{data.论坛}}
+- 发帖人: {{data.发帖人}}
+- URL: {{data.URL}}
+- 发布时间: {{data.发布时间}}
+
+调查任务：
+1. 发帖人身份调查
+   - 搜索该用户名在其他平台的账号
+   - 历史发帖记录和风格
+   - 是否为水军或营销号特征
+
+2. 帖子传播分析
+   - 帖子是否被转载到其他平台
+   - 主流媒体是否有报道
+   - 社交媒体讨论情况
+
+3. 讨论参与者分析
+   - 主要回复者身份
+   - 是否有组织化评论
+   - 舆论引导痕迹
+
+4. 内容真实性核查
+   - 帖子中的事实核查
+   - 是否为谣言或虚假信息
+   - 原始信息来源追溯
+
+创建实体：
+- 发帖人创建 ENTITY 或 SOCIAL_PROFILE 节点
+- 重要回复者创建 ENTITY 节点
+- 被提及的组织创建 ORGANIZATION 节点
+- 相关事件创建 EVENT 节点
+
+关系标注：
+- "发布"、"转载自"、"回复"、"提及"`,
+    autoExpand: true,
+    isSimulated: false
+  },
+  {
+    id: 'agent_blog_content',
+    category: ToolCategory.AGENT,
+    name: '博客内容分析',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【博客】分析博客文章的主题、情感倾向、写作风格及潜在意图。',
+    targetTypes: [NodeType.BLOG],
+    promptTemplate: `分析博客内容：
+
+博客：{{title}}
+内容：{{content}}
+
+分析要点：
+1. 主题提取：文章的核心主题和关键词
+2. 情感分析：整体情感倾向（正面/负面/中性）
+3. 写作风格：专业性、受众定位、语言特点
+4. 立场分析：作者的观点和潜在立场
+5. 信息价值：是否包含独家信息或情报价值
+
+更新属性：
+- 主题标签
+- 情感倾向
+- 可信度评估`,
+    autoExpand: false,
+    isSimulated: false
+  },
+  {
+    id: 'agent_forum_sentiment',
+    category: ToolCategory.AGENT,
+    name: '论坛舆情分析',
+    version: '1.0',
+    author: 'Nexus Media',
+    description: '【论坛】分析帖子的舆情热度、讨论焦点及群体情绪。',
+    targetTypes: [NodeType.FORUM_POST],
+    promptTemplate: `分析论坛帖子舆情：
+
+帖子：{{title}}
+内容：{{content}}
+回复数：{{data.回复数}}
+
+分析维度：
+1. 热度评估：根据回复数和内容判断热度等级
+2. 讨论焦点：核心争议点或关注点
+3. 群体情绪：整体讨论氛围
+4. 风险识别：是否涉及敏感话题
+5. 传播潜力：是否可能进一步发酵
+
+更新属性：
+- 舆情热度（低/中/高/爆）
+- 情绪基调
+- 风险等级`,
+    autoExpand: false,
     isSimulated: false
   }
 ];

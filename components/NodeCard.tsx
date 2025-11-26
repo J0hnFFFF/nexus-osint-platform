@@ -55,6 +55,9 @@ const parseCoordinates = (value: string): { lat: number; lng: number } | null =>
 // Fields that may contain coordinates
 const COORDINATE_FIELDS = ['经纬度', '坐标', 'coordinates', 'latlng', 'location'];
 
+// Fields that may contain address (for map search)
+const ADDRESS_FIELDS = ['详细地址', '地址', 'address', '位置', '总部地址', '注册地址', '物理位置', '开户行地址'];
+
 export const NodeCard: React.FC<NodeCardProps> = ({
   node, isSelected, onPointerDown, onStartConnect, onContextMenu,
   communityId, isKeyNode, centrality
@@ -246,10 +249,18 @@ export const NodeCard: React.FC<NodeCardProps> = ({
   });
   const coordData = coordEntry ? parseCoordinates(String(coordEntry[1])) : null;
 
-  // Filter out coordinate field from regular display
-  const nonCoordData = coordEntry
-    ? populatedData.filter(([k]) => k !== coordEntry[0])
-    : populatedData;
+  // Extract address field (for map search when no coordinates)
+  const addressEntry = populatedData.find(([k, v]) => {
+    const isAddressField = ADDRESS_FIELDS.some(f => k.toLowerCase().includes(f.toLowerCase()));
+    return isAddressField && String(v).trim().length > 0;
+  });
+
+  // Filter out coordinate and address fields from regular display
+  const nonCoordData = populatedData.filter(([k]) => {
+    if (coordEntry && k === coordEntry[0]) return false;
+    if (addressEntry && k === addressEntry[0]) return false;
+    return true;
+  });
 
   return (
     <div
@@ -323,6 +334,33 @@ export const NodeCard: React.FC<NodeCardProps> = ({
                       label={node.title}
                       onExpand={() => handleOpenMap(coordData)}
                     />
+                </div>
+            </div>
+         )}
+
+         {/* Address Preview with Map Search (shown when no coordinates but address exists) */}
+         {!coordData && addressEntry && (
+            <div className="bg-black/20 rounded p-2 border border-white/5">
+                <div className="flex flex-col text-[9px] font-mono">
+                    <div className="flex items-center justify-between text-slate-500 mb-1">
+                       <span>{addressEntry[0]}:</span>
+                       <MapPin className="w-3 h-3 text-red-500" />
+                    </div>
+                    <div className="text-[10px] text-slate-300 mb-2 break-words">
+                       {String(addressEntry[1])}
+                    </div>
+                    <button
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         const address = encodeURIComponent(String(addressEntry[1]));
+                         window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
+                       }}
+                       onPointerDown={(e) => e.stopPropagation()}
+                       className="flex items-center justify-center gap-1 w-full py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-cyan-400 transition-colors"
+                    >
+                       <MapPin className="w-3 h-3" />
+                       在地图中查看
+                    </button>
                 </div>
             </div>
          )}
