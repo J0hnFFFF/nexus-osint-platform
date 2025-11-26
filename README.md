@@ -673,7 +673,7 @@ A:
 
 - [x] 核心图谱引擎
 - [x] 110+ 实体类型
-- [x] 44+ OSINT 工具
+- [x] 59+ OSINT 工具
 - [x] Google Gemini 集成
 - [x] Search Grounding 支持
 - [x] 桌面应用打包
