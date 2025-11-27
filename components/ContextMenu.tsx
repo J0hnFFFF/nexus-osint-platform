@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import { Play, Zap, X, Trash2, Route } from 'lucide-react';
+import { Play, Zap, X, Trash2, Route, Eye } from 'lucide-react';
 import { Tool, IntelNode } from '../types';
 
 interface ContextMenuProps {
@@ -12,6 +12,7 @@ interface ContextMenuProps {
   onDelete: () => void;
   onClose: () => void;
   onAnalyzeTrajectory?: () => void;
+  onViewDetail?: () => void;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -22,7 +23,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onRunTool,
   onDelete,
   onClose,
-  onAnalyzeTrajectory
+  onAnalyzeTrajectory,
+  onViewDetail
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +100,21 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         )}
       </div>
       
+      {/* 查看详情 */}
+      {onViewDetail && (
+        <div className="p-1 border-t border-slate-800 bg-slate-950/30">
+          <button
+            onClick={() => { onViewDetail(); onClose(); }}
+            className="w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-cyan-900/20 hover:text-cyan-400 rounded text-slate-400 transition-colors group"
+          >
+            <div className="p-1 bg-slate-800 group-hover:bg-cyan-900/50 rounded text-slate-500 group-hover:text-cyan-400">
+               <Eye className="w-3 h-3" />
+            </div>
+            <span className="text-xs font-medium">查看详情</span>
+          </button>
+        </div>
+      )}
+
       {/* 分析功能 */}
       {onAnalyzeTrajectory && (
         <div className="p-1 border-t border-slate-800 bg-slate-950/30">

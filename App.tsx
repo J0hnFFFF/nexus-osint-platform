@@ -4,6 +4,7 @@ import { Canvas } from './components/Canvas';
 import { ControlPanel } from './components/ControlPanel';
 import { ContextMenu } from './components/ContextMenu';
 import { TrajectoryModal, extractTrajectoryPoints } from './components/TrajectoryModal';
+import { NodeDetailPanel } from './components/NodeDetailPanel';
 import { IntelNode, Connection, NodeType, Position, LogEntry, Tool, AIModelConfig } from './types';
 import { executeTool, generateFinalReport, BriefingContext } from './services/geminiService';
 import { analyzeGraph, GraphAnalysisResult } from './services/graphAnalysis';
@@ -51,6 +52,9 @@ const App: React.FC = () => {
 
   // Trajectory Analysis State
   const [trajectoryModal, setTrajectoryModal] = useState<{ isOpen: boolean; nodeId: string | null }>({ isOpen: false, nodeId: null });
+
+  // Node Detail Panel State
+  const [detailPanel, setDetailPanel] = useState<{ isOpen: boolean; nodeId: string | null }>({ isOpen: false, nodeId: null });
 
   // Graph Analysis State (Community Detection & Key Nodes)
   const [graphAnalysis, setGraphAnalysis] = useState<GraphAnalysisResult | null>(null);
@@ -694,6 +698,7 @@ const App: React.FC = () => {
                     onDelete={() => deleteNodes([node.id])}
                     onClose={() => setContextMenu(null)}
                     onAnalyzeTrajectory={() => handleAnalyzeTrajectory(node.id)}
+                    onViewDetail={() => setDetailPanel({ isOpen: true, nodeId: node.id })}
                   />
               )
           })()}
@@ -799,6 +804,13 @@ const App: React.FC = () => {
            />
          );
        })()}
+
+       {/* Node Detail Panel */}
+       <NodeDetailPanel
+         isOpen={detailPanel.isOpen}
+         onClose={() => setDetailPanel({ isOpen: false, nodeId: null })}
+         node={detailPanel.nodeId ? nodes.find(n => n.id === detailPanel.nodeId) || null : null}
+       />
     </div>
   );
 };
