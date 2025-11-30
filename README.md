@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-6.0.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
+  <img src="https://img.shields.io/badge/License-AGPL--3.0-blue" alt="License">
   <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React">
   <img src="https://img.shields.io/badge/AI-Gemini%202.5-4285F4" alt="Gemini">
   <img src="https://img.shields.io/badge/Platform-Web%20|%20Windows%20|%20macOS%20|%20Linux-lightgrey" alt="Platform">
@@ -229,23 +229,31 @@ npm run electron:build
 
 ## 许可证
 
-本项目采用 [Apache License 2.0](./LICENSE) 开源协议。
+本项目采用 **双重授权** 模式：
+
+### 开源协议 (AGPL-3.0)
+
+社区版采用 [GNU Affero General Public License v3.0](./LICENSE) 开源协议。
 
 ```
 Copyright 2024-2025 He Tu Contributors
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 ```
+
+**AGPL-3.0 要求**：如果您修改本软件并通过网络提供服务，必须公开您的修改后的源代码。
+
+### 商业授权
+
+如果您希望：
+- 在闭源产品中使用河图
+- 不公开您的修改
+- 获得商业技术支持
+
+请联系我们获取商业授权：**j0hn.wahahaha@gmail.com**
 
 ---
 
