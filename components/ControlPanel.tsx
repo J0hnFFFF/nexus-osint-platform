@@ -48,7 +48,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   isProcessing,
   aiConfig,
   onUpdateAiConfig,
-  onLog
+  onLog,
 }) => {
   const [activeTab, setActiveTab] = useState<'inspector' | 'plugins' | 'timeline' | 'logs' | 'settings'>('plugins');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1206,7 +1206,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div className="p-2 bg-slate-950 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
          <div className="flex items-center gap-2">
-             <span>OSINT Kernel v5.9</span>
+             <span>OSINT Kernel v6.0</span>
              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
                  {aiConfig.modelId.includes('flash') ? 'FLASH' : 'PRO'}
              </span>

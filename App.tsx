@@ -5,7 +5,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { ContextMenu } from './components/ContextMenu';
 import { TrajectoryModal, extractTrajectoryPoints } from './components/TrajectoryModal';
 import { NodeDetailPanel } from './components/NodeDetailPanel';
-import { IntelNode, Connection, NodeType, Position, LogEntry, Tool, AIModelConfig } from './types';
+import { IntelNode, Connection, NodeType, Position, LogEntry, Tool, AIModelConfig, Project, CanvasData, Snapshot } from './types';
 import { executeTool, generateFinalReport, BriefingContext } from './services/geminiService';
 import { analyzeGraph, GraphAnalysisResult } from './services/graphAnalysis';
 import { analyzeInvestigation, InvestigationAnalysis } from './services/investigationEngine';
@@ -13,7 +13,7 @@ import { analyzeDataQuality, DataQualityReport } from './services/dataQualityEng
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { ENTITY_DEFAULT_FIELDS } from './constants';
 import { DEFAULT_TOOLS } from './tools';
-import { Search, Layout, Save, FolderOpen, Network, Trash2, FileText, X, FileOutput, RefreshCw } from 'lucide-react';
+import { Search, Layout, Save, FolderOpen, Network, Trash2, FileText, X, FileOutput, RefreshCw, Folder, ChevronDown, Plus, Camera, Layers, Edit3, GitBranch } from 'lucide-react';
 import {
   saveAIConfig,
   loadAIConfig,
@@ -21,7 +21,27 @@ import {
   loadCustomTools,
   saveGraphData,
   loadGraphData,
-  hasGraphData
+  hasGraphData,
+  // 6.0 多画布
+  initializeStorage,
+  saveLastUsed,
+  loadProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  loadCanvases,
+  createCanvas,
+  updateCanvas,
+  deleteCanvas,
+  duplicateCanvas,
+  saveCanvasData,
+  loadCanvasData,
+  // 快照
+  createSnapshot,
+  loadSnapshots,
+  loadSnapshotData,
+  deleteSnapshot,
+  cleanupSnapshots,
 } from './services/storageService';
 
 const uuid = () => Math.random().toString(36).substr(2, 9);
@@ -76,6 +96,19 @@ const App: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // 6.0 多画布工作区状态
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [canvases, setCanvases] = useState<CanvasData[]>([]);
+  const [currentCanvasId, setCurrentCanvasId] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [isSwitchingCanvas, setIsSwitchingCanvas] = useState(false);
+  // 工作区UI状态
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [showSnapshotDropdown, setShowSnapshotDropdown] = useState(false);
+  const [newCanvasName, setNewCanvasName] = useState('');
+  const [newProjectName, setNewProjectName] = useState('');
+
   // Refs for async access in loops
   const nodesRef = useRef(nodes);
   nodesRef.current = nodes;
@@ -103,13 +136,30 @@ const App: React.FC = () => {
           setTools([...DEFAULT_TOOLS, ...savedTools]);
         }
 
-        // 检查并加载图谱数据
-        const hasData = await hasGraphData();
-        if (hasData) {
-          const { nodes: savedNodes, connections: savedConnections } = await loadGraphData();
-          setNodes(savedNodes);
-          setConnections(savedConnections);
-          addLog(`已恢复上次保存的图谱数据: ${savedNodes.length} 个节点, ${savedConnections.length} 个连接`, 'success');
+        // 6.0: 初始化存储并获取上次使用的项目/画布
+        const { currentProjectId: projId, currentCanvasId: canvId } = await initializeStorage();
+
+        // 加载项目列表
+        const projectList = await loadProjects();
+        setProjects(projectList);
+        setCurrentProjectId(projId);
+
+        // 加载当前项目的画布列表
+        const canvasList = await loadCanvases(projId);
+        setCanvases(canvasList);
+        setCurrentCanvasId(canvId);
+
+        // 加载当前画布的数据
+        const { nodes: savedNodes, connections: savedConnections } = await loadCanvasData(canvId);
+        setNodes(savedNodes);
+        setConnections(savedConnections);
+
+        // 加载当前画布的快照
+        const snapshotList = await loadSnapshots(canvId);
+        setSnapshots(snapshotList);
+
+        if (savedNodes.length > 0) {
+          addLog(`已恢复画布数据: ${savedNodes.length} 个节点, ${savedConnections.length} 个连接`, 'success');
         }
 
         setIsInitialized(true);
@@ -140,32 +190,281 @@ const App: React.FC = () => {
     }
   }, [nodes, connections, isInitialized]);
 
+  // --- 6.0: 点击外部关闭下拉菜单 ---
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // 如果点击的不是下拉菜单内部，关闭下拉菜单
+      if (!target.closest('[data-dropdown]')) {
+        setShowWorkspaceDropdown(false);
+        setShowSnapshotDropdown(false);
+      }
+    };
+
+    if (showWorkspaceDropdown || showSnapshotDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showWorkspaceDropdown, showSnapshotDropdown]);
+
   // --- Persistence: 手动保存图谱 ---
   const handleSaveGraph = useCallback(async () => {
+    if (!currentCanvasId) return;
     try {
-      await saveGraphData(nodes, connections);
+      await saveCanvasData(currentCanvasId, nodes, connections);
+      await saveLastUsed(currentProjectId!, currentCanvasId);
       setHasUnsavedChanges(false);
       addLog(`图谱已保存: ${nodes.length} 个节点, ${connections.length} 个连接`, 'success');
     } catch (error) {
       addLog(`保存图谱失败: ${error}`, 'error');
     }
-  }, [nodes, connections, addLog]);
+  }, [nodes, connections, currentCanvasId, currentProjectId, addLog]);
 
   // --- Persistence: 从本地加载图谱 ---
   const handleLoadGraph = useCallback(async () => {
+    if (!currentCanvasId) return;
     try {
-      const hasData = await hasGraphData();
-      if (!hasData) {
-        addLog('本地没有已保存的图谱数据', 'warning');
-        return;
-      }
-      const { nodes: savedNodes, connections: savedConnections } = await loadGraphData();
+      const { nodes: savedNodes, connections: savedConnections } = await loadCanvasData(currentCanvasId);
       setNodes(savedNodes);
       setConnections(savedConnections);
       setHasUnsavedChanges(false);
       addLog(`已加载图谱: ${savedNodes.length} 个节点, ${savedConnections.length} 个连接`, 'success');
     } catch (error) {
       addLog(`加载图谱失败: ${error}`, 'error');
+    }
+  }, [currentCanvasId, addLog]);
+
+  // --- 6.0: 画布切换 ---
+  const handleSwitchCanvas = useCallback(async (canvasId: string) => {
+    if (canvasId === currentCanvasId || isSwitchingCanvas) return;
+
+    setIsSwitchingCanvas(true);
+    try {
+      // 保存当前画布
+      if (currentCanvasId && hasUnsavedChanges) {
+        await saveCanvasData(currentCanvasId, nodes, connections);
+      }
+
+      // 加载目标画布
+      const { nodes: newNodes, connections: newConns } = await loadCanvasData(canvasId);
+      setNodes(newNodes);
+      setConnections(newConns);
+      setCurrentCanvasId(canvasId);
+      setSelectedNodeIds([]);
+      setHasUnsavedChanges(false);
+
+      // 加载目标画布的快照
+      const snapshotList = await loadSnapshots(canvasId);
+      setSnapshots(snapshotList);
+
+      // 保存上次使用
+      await saveLastUsed(currentProjectId!, canvasId);
+
+      const canvas = canvases.find(c => c.id === canvasId);
+      addLog(`切换到画布: ${canvas?.name || canvasId}`, 'info');
+    } catch (error) {
+      addLog(`切换画布失败: ${error}`, 'error');
+    }
+    setIsSwitchingCanvas(false);
+  }, [currentCanvasId, currentProjectId, nodes, connections, hasUnsavedChanges, canvases, isSwitchingCanvas, addLog]);
+
+  // --- 6.0: 项目切换 ---
+  const handleSwitchProject = useCallback(async (projectId: string) => {
+    if (projectId === currentProjectId) return;
+
+    setIsSwitchingCanvas(true);
+    try {
+      // 保存当前画布
+      if (currentCanvasId && hasUnsavedChanges) {
+        await saveCanvasData(currentCanvasId, nodes, connections);
+      }
+
+      // 加载新项目的画布列表
+      const canvasList = await loadCanvases(projectId);
+      setCanvases(canvasList);
+      setCurrentProjectId(projectId);
+
+      // 切换到新项目的第一个画布
+      if (canvasList.length > 0) {
+        const firstCanvas = canvasList[0];
+        const { nodes: newNodes, connections: newConns } = await loadCanvasData(firstCanvas.id);
+        setNodes(newNodes);
+        setConnections(newConns);
+        setCurrentCanvasId(firstCanvas.id);
+
+        const snapshotList = await loadSnapshots(firstCanvas.id);
+        setSnapshots(snapshotList);
+
+        await saveLastUsed(projectId, firstCanvas.id);
+      } else {
+        setNodes([]);
+        setConnections([]);
+        setCurrentCanvasId(null);
+        setSnapshots([]);
+      }
+
+      setSelectedNodeIds([]);
+      setHasUnsavedChanges(false);
+
+      const project = projects.find(p => p.id === projectId);
+      addLog(`切换到项目: ${project?.name || projectId}`, 'info');
+    } catch (error) {
+      addLog(`切换项目失败: ${error}`, 'error');
+    }
+    setIsSwitchingCanvas(false);
+  }, [currentProjectId, currentCanvasId, nodes, connections, hasUnsavedChanges, projects, addLog]);
+
+  // --- 6.0: 创建新画布 ---
+  const handleCreateCanvas = useCallback(async (name: string) => {
+    if (!currentProjectId) return;
+    try {
+      const newCanvas = await createCanvas(currentProjectId, name);
+      setCanvases(prev => [...prev, newCanvas]);
+      await handleSwitchCanvas(newCanvas.id);
+      addLog(`创建新画布: ${name}`, 'success');
+    } catch (error) {
+      addLog(`创建画布失败: ${error}`, 'error');
+    }
+  }, [currentProjectId, handleSwitchCanvas, addLog]);
+
+  // --- 6.0: 删除画布 ---
+  const handleDeleteCanvas = useCallback(async (canvasId: string) => {
+    if (canvases.length <= 1) {
+      addLog('无法删除唯一的画布', 'warning');
+      return;
+    }
+    try {
+      await deleteCanvas(canvasId);
+      const newCanvases = canvases.filter(c => c.id !== canvasId);
+      setCanvases(newCanvases);
+
+      // 如果删除的是当前画布，切换到第一个
+      if (canvasId === currentCanvasId && newCanvases.length > 0) {
+        await handleSwitchCanvas(newCanvases[0].id);
+      }
+      addLog(`已删除画布`, 'warning');
+    } catch (error) {
+      addLog(`删除画布失败: ${error}`, 'error');
+    }
+  }, [canvases, currentCanvasId, handleSwitchCanvas, addLog]);
+
+  // --- 6.0: 复制画布 ---
+  const handleDuplicateCanvas = useCallback(async (canvasId: string, newName: string) => {
+    try {
+      const newCanvas = await duplicateCanvas(canvasId, newName);
+      setCanvases(prev => [...prev, newCanvas]);
+      addLog(`已复制画布: ${newName}`, 'success');
+    } catch (error) {
+      addLog(`复制画布失败: ${error}`, 'error');
+    }
+  }, [addLog]);
+
+  // --- 6.0: 创建快照 ---
+  const handleCreateSnapshot = useCallback(async (name: string) => {
+    if (!currentCanvasId) return;
+    try {
+      const snapshot = await createSnapshot(
+        currentCanvasId,
+        name,
+        'manual',
+        nodes,
+        connections
+      );
+      setSnapshots(prev => [snapshot, ...prev]);
+
+      // 自动清理旧快照
+      const cleaned = await cleanupSnapshots(currentCanvasId, 20);
+      if (cleaned > 0) {
+        setSnapshots(prev => prev.slice(0, 20));
+      }
+
+      addLog(`已创建快照: ${name} (${nodes.length} 节点)`, 'success');
+    } catch (error) {
+      addLog(`创建快照失败: ${error}`, 'error');
+    }
+  }, [currentCanvasId, nodes, connections, addLog]);
+
+  // --- 6.0: 恢复快照 ---
+  const handleRestoreSnapshot = useCallback(async (snapshotId: string) => {
+    try {
+      const data = await loadSnapshotData(snapshotId);
+      if (data) {
+        setNodes(data.nodes);
+        setConnections(data.connections);
+        setHasUnsavedChanges(true);
+        setSelectedNodeIds([]);
+
+        const snapshot = snapshots.find(s => s.id === snapshotId);
+        addLog(`已恢复快照: ${snapshot?.name || snapshotId}`, 'success');
+      }
+    } catch (error) {
+      addLog(`恢复快照失败: ${error}`, 'error');
+    }
+  }, [snapshots, addLog]);
+
+  // --- 6.0: 删除快照 ---
+  const handleDeleteSnapshot = useCallback(async (snapshotId: string) => {
+    try {
+      await deleteSnapshot(snapshotId);
+      setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
+      addLog(`已删除快照`, 'info');
+    } catch (error) {
+      addLog(`删除快照失败: ${error}`, 'error');
+    }
+  }, [addLog]);
+
+  // --- 6.0: 创建新项目 ---
+  const handleCreateProject = useCallback(async (name: string) => {
+    try {
+      const newProject = await createProject(name);
+      const projectList = await loadProjects();
+      setProjects(projectList);
+      await handleSwitchProject(newProject.id);
+      addLog(`创建新项目: ${name}`, 'success');
+    } catch (error) {
+      addLog(`创建项目失败: ${error}`, 'error');
+    }
+  }, [handleSwitchProject, addLog]);
+
+  // --- 6.0: 删除项目 ---
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    if (projects.length <= 1) {
+      addLog('无法删除唯一的项目', 'warning');
+      return;
+    }
+    try {
+      await deleteProject(projectId);
+      const newProjects = projects.filter(p => p.id !== projectId);
+      setProjects(newProjects);
+
+      if (projectId === currentProjectId && newProjects.length > 0) {
+        await handleSwitchProject(newProjects[0].id);
+      }
+      addLog(`已删除项目`, 'warning');
+    } catch (error) {
+      addLog(`删除项目失败: ${error}`, 'error');
+    }
+  }, [projects, currentProjectId, handleSwitchProject, addLog]);
+
+  // --- 6.0: 重命名画布 ---
+  const handleRenameCanvas = useCallback(async (canvasId: string, newName: string) => {
+    try {
+      await updateCanvas(canvasId, { name: newName });
+      setCanvases(prev => prev.map(c => c.id === canvasId ? { ...c, name: newName } : c));
+      addLog(`画布已重命名: ${newName}`, 'info');
+    } catch (error) {
+      addLog(`重命名失败: ${error}`, 'error');
+    }
+  }, [addLog]);
+
+  // --- 6.0: 重命名项目 ---
+  const handleRenameProject = useCallback(async (projectId: string, newName: string) => {
+    try {
+      await updateProject(projectId, { name: newName });
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, name: newName } : p));
+      addLog(`项目已重命名: ${newName}`, 'info');
+    } catch (error) {
+      addLog(`重命名失败: ${error}`, 'error');
     }
   }, [addLog]);
 
@@ -603,6 +902,106 @@ const App: React.FC = () => {
              </div>
           </div>
 
+          {/* 6.0 项目/画布指示器 */}
+          <div className="relative" data-dropdown>
+            <button
+              onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+              className="bg-slate-900/90 backdrop-blur border border-slate-700 hover:border-blue-500 rounded shadow-lg h-[50px] px-4 flex items-center gap-2 transition-all hover:bg-blue-900/20 group"
+            >
+              <Folder className="w-4 h-4 text-blue-400" />
+              <div className="flex flex-col items-start">
+                <span className="text-[9px] text-slate-500">{projects.find(p => p.id === currentProjectId)?.name || '项目'}</span>
+                <span className="text-xs text-slate-200">{canvases.find(c => c.id === currentCanvasId)?.name || '画布'}</span>
+              </div>
+              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showWorkspaceDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showWorkspaceDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-72 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                {/* 项目选择 */}
+                <div className="p-2 border-b border-slate-800">
+                  <div className="text-[9px] text-slate-500 uppercase font-bold mb-1 px-2">项目</div>
+                  <div className="max-h-32 overflow-y-auto space-y-0.5">
+                    {projects.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => { handleSwitchProject(p.id); setShowWorkspaceDropdown(false); }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                          p.id === currentProjectId ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    <input
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      placeholder="新项目..."
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 placeholder:text-slate-600 outline-none"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newProjectName.trim()) {
+                          handleCreateProject(newProjectName.trim());
+                          setNewProjectName('');
+                        }
+                      }}
+                      disabled={!newProjectName.trim()}
+                      className="p-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white rounded"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 画布选择 */}
+                <div className="p-2">
+                  <div className="text-[9px] text-slate-500 uppercase font-bold mb-1 px-2">画布</div>
+                  <div className="max-h-40 overflow-y-auto space-y-0.5">
+                    {canvases.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => { handleSwitchCanvas(c.id); setShowWorkspaceDropdown(false); }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center justify-between transition-colors ${
+                          c.id === currentCanvasId ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1">
+                          {c.name}
+                          {c.isDefault && <span className="text-[8px] opacity-60">(默认)</span>}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    <input
+                      value={newCanvasName}
+                      onChange={(e) => setNewCanvasName(e.target.value)}
+                      placeholder="新画布..."
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 placeholder:text-slate-600 outline-none"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newCanvasName.trim()) {
+                          handleCreateCanvas(newCanvasName.trim());
+                          setNewCanvasName('');
+                        }
+                      }}
+                      disabled={!newCanvasName.trim()}
+                      className="p-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white rounded"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-slate-900/90 backdrop-blur border border-slate-700 rounded shadow-lg flex items-center h-[50px] w-[300px] px-3 focus-within:border-cyan-500 transition-colors">
               <Search className="w-4 h-4 text-slate-500 mr-2" />
               <input
@@ -689,6 +1088,125 @@ const App: React.FC = () => {
                 <FolderOpen className="w-4 h-4 text-slate-400 group-hover:text-slate-300 transition-colors" />
                 <span className="text-xs text-slate-400 group-hover:text-slate-300">加载</span>
             </button>
+          </div>
+
+          {/* 6.0 快照按钮 */}
+          <div className="relative" data-dropdown>
+            <button
+              onClick={() => setShowSnapshotDropdown(!showSnapshotDropdown)}
+              title="快照 / Snapshots"
+              className={`bg-slate-900/90 backdrop-blur border rounded shadow-lg h-[50px] px-4 flex items-center justify-center gap-2 transition-all group ${
+                snapshots.length > 0
+                  ? 'border-emerald-700 hover:border-emerald-500 hover:bg-emerald-900/20'
+                  : 'border-slate-700 hover:border-emerald-500 hover:bg-emerald-900/20'
+              }`}
+            >
+              <Camera className={`w-4 h-4 transition-colors ${snapshots.length > 0 ? 'text-emerald-400' : 'text-slate-400 group-hover:text-emerald-400'}`} />
+              <span className={`text-xs transition-colors ${snapshots.length > 0 ? 'text-emerald-400' : 'text-slate-400 group-hover:text-emerald-400'}`}>
+                {snapshots.length > 0 ? `快照(${snapshots.length})` : '快照'}
+              </span>
+              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showSnapshotDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showSnapshotDropdown && (
+              <div className="absolute top-full right-0 mt-1 w-80 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                {/* 创建快照 */}
+                <div className="p-3 border-b border-slate-800">
+                  <div className="text-[9px] text-slate-500 uppercase font-bold mb-2">创建快照</div>
+                  <div className="flex gap-2">
+                    <input
+                      id="snapshot-name-input"
+                      placeholder={`快照 ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-600 outline-none focus:border-emerald-500"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const input = e.target as HTMLInputElement;
+                          const name = input.value.trim() || `快照 ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+                          handleCreateSnapshot(name);
+                          input.value = '';
+                          setShowSnapshotDropdown(false);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById('snapshot-name-input') as HTMLInputElement;
+                        const name = input?.value.trim() || `快照 ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
+                        handleCreateSnapshot(name);
+                        if (input) input.value = '';
+                        setShowSnapshotDropdown(false);
+                      }}
+                      disabled={nodes.length === 0}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded text-xs flex items-center gap-1 transition-colors"
+                    >
+                      <Camera className="w-3 h-3" />
+                      创建
+                    </button>
+                  </div>
+                  {nodes.length === 0 && (
+                    <div className="text-[10px] text-slate-500 mt-1">画布为空，无法创建快照</div>
+                  )}
+                </div>
+
+                {/* 快照列表 */}
+                <div className="p-2">
+                  <div className="text-[9px] text-slate-500 uppercase font-bold mb-1 px-1 flex items-center justify-between">
+                    <span>历史快照</span>
+                    <span className="text-slate-600">最多保留 20 个</span>
+                  </div>
+                  {snapshots.length === 0 ? (
+                    <div className="text-xs text-slate-600 text-center py-4">暂无快照</div>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {snapshots.map(s => (
+                        <div
+                          key={s.id}
+                          className="group flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-800 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-slate-300 truncate">{s.name}</div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-2">
+                              <span>{new Date(s.createdAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-slate-600">|</span>
+                              <span>{s.nodeCount} 节点</span>
+                              {s.trigger !== 'manual' && (
+                                <span className="text-emerald-500/60">({s.trigger})</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`确定要恢复到快照 "${s.name}" 吗？当前画布内容将被替换。`)) {
+                                  handleRestoreSnapshot(s.id);
+                                  setShowSnapshotDropdown(false);
+                                }
+                              }}
+                              className="p-1 hover:bg-emerald-600 rounded text-slate-400 hover:text-white transition-colors"
+                              title="恢复此快照"
+                            >
+                              <GitBranch className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`确定要删除快照 "${s.name}" 吗？`)) {
+                                  handleDeleteSnapshot(s.id);
+                                }
+                              }}
+                              className="p-1 hover:bg-red-600 rounded text-slate-400 hover:text-white transition-colors"
+                              title="删除此快照"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
        </div>
 

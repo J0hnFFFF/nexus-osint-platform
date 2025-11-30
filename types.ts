@@ -219,3 +219,54 @@ export interface AIModelConfig {
   enableThinking: boolean;
   thinkingBudget: number;
 }
+
+// ============ 6.0 多画布工作区 ============
+
+/** 项目 - 顶层容器，对应一个调查案件 */
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;    // ISO 时间戳
+  updatedAt: string;
+  // 7.0 协作预留
+  ownerId?: string;
+  teamId?: string;
+}
+
+/** 画布 - 项目内的分析视图 */
+export interface CanvasData {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  isDefault?: boolean;  // 项目默认画布
+  // 7.0 协作预留
+  createdBy?: string;
+}
+
+/** 快照触发类型 */
+export type SnapshotTrigger = 'manual' | 'auto' | 'before_tool' | 'import';
+
+/** 快照 - 画布的历史版本 */
+export interface Snapshot {
+  id: string;
+  canvasId: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  trigger: SnapshotTrigger;
+  nodeCount: number;
+  connectionCount: number;
+  // 7.0 协作预留
+  createdBy?: string;
+}
+
+/** 快照数据 - 独立存储，避免列表加载慢 */
+export interface SnapshotData {
+  snapshotId: string;
+  nodes: IntelNode[];
+  connections: Connection[];
+}
