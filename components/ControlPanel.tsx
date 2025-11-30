@@ -775,14 +775,19 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </h3>
             <div className="grid grid-cols-3 gap-2">
                 {items.map(item => (
-                    <button 
+                    <div
                         key={item.t}
-                        onClick={() => onAddNode(item.t)}
-                        className="p-2 bg-slate-900 border border-slate-800 rounded hover:bg-slate-800 hover:border-slate-600 flex flex-col items-center gap-1.5 group transition-colors"
+                        draggable
+                        onDragStart={(e) => {
+                            e.dataTransfer.setData('application/node-type', item.t);
+                            e.dataTransfer.effectAllowed = 'copy';
+                        }}
+                        className="p-2 bg-slate-900 border border-slate-800 rounded hover:bg-slate-800 hover:border-slate-600 flex flex-col items-center gap-1.5 group transition-colors cursor-grab active:cursor-grabbing"
+                        title={`拖拽到画布创建 ${item.l}`}
                     >
                         <item.Icon className="w-4 h-4 text-slate-500 group-hover:text-cyan-400" />
                         <span className="text-[8px] text-slate-400 group-hover:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">{item.l}</span>
-                    </button>
+                    </div>
                 ))}
             </div>
         </div>
@@ -1201,7 +1206,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div className="p-2 bg-slate-950 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
          <div className="flex items-center gap-2">
-             <span>OSINT Kernel v5.8</span>
+             <span>OSINT Kernel v5.9</span>
              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
                  {aiConfig.modelId.includes('flash') ? 'FLASH' : 'PRO'}
              </span>

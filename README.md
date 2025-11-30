@@ -1,7 +1,7 @@
 # 河图情报分析系统
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-5.8.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-5.9.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React">
   <img src="https://img.shields.io/badge/AI-Gemini%202.5-4285F4" alt="Gemini">

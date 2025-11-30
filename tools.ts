@@ -275,9 +275,9 @@ export const DEFAULT_TOOLS: Tool[] = [
     version: 'Live',
     author: 'Google',
     description: '【真实】实时检索关于该实体的最新互联网情报。',
-    targetTypes: [NodeType.ENTITY, NodeType.ORGANIZATION, NodeType.SEARCH_QUERY],
+    targetTypes: [],  // 全局工具 - 适用于所有实体类型
     mcpConfig: { functionName: 'googleSearch' },
-    promptTemplate: "使用 Google 搜索查询关于目标的最新信息。提取：\n1. 相关的近期新闻。\n2. 关联的社交媒体账号。\n3. 已知的公开声明或事件。",
+    promptTemplate: "使用 Google 搜索查询关于「{{title}}」的最新信息。提取：\n1. 相关的近期新闻。\n2. 关联的社交媒体账号或网站。\n3. 已知的公开声明或事件。\n4. 其他有价值的情报线索。",
     autoExpand: true,
     isSimulated: false
   },
@@ -712,6 +712,45 @@ export const DEFAULT_TOOLS: Tool[] = [
 - 恶意脚本创建CODE_SNIPPET节点
 - 最终重定向目标创建新URL节点
 - SSL证书创建SSL_CERT节点`,
+    autoExpand: true,
+    isSimulated: false
+  },
+
+  {
+    id: 'mcp_web_content_extract',
+    category: ToolCategory.MCP,
+    name: '网页内容提取 (Web Extract)',
+    version: 'Live',
+    author: 'OSINT',
+    description: '【真实】抓取网页内容，提取关键实体和情报信息',
+    targetTypes: [NodeType.URL, NodeType.DOMAIN],
+    mcpConfig: { functionName: 'googleSearch' },
+    promptTemplate: `访问并分析该URL「{{title}}」的网页内容。
+
+提取以下信息：
+1. **页面摘要** - 网页的主要内容和目的（100字以内）
+2. **关键实体**
+   - 人名（ENTITY）
+   - 组织/公司名（ORGANIZATION）
+   - 地理位置（GEO_LOCATION）
+   - 联系方式：邮箱（EMAIL）、电话（PHONE_NUMBER）
+   - 社交账号链接（SOCIAL_PROFILE）
+3. **关联链接** - 页面中的重要外链（URL）
+4. **时间信息** - 发布日期、更新时间等（EVENT）
+5. **关键数据** - 金额、统计数字等重要数据点
+
+创建实体规则：
+- 每个识别到的人名创建 ENTITY 节点
+- 每个组织创建 ORGANIZATION 节点
+- 每个邮箱创建 EMAIL 节点
+- 每个电话创建 PHONE_NUMBER 节点
+- 重要外链创建 URL 节点
+- 地址创建 GEO_LOCATION 节点
+
+注意：
+- 优先提取与情报调查相关的实体
+- 忽略通用的页脚链接和广告内容
+- 如页面无法访问，说明原因`,
     autoExpand: true,
     isSimulated: false
   },

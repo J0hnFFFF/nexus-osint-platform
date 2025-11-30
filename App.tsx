@@ -9,6 +9,7 @@ import { IntelNode, Connection, NodeType, Position, LogEntry, Tool, AIModelConfi
 import { executeTool, generateFinalReport, BriefingContext } from './services/geminiService';
 import { analyzeGraph, GraphAnalysisResult } from './services/graphAnalysis';
 import { analyzeInvestigation, InvestigationAnalysis } from './services/investigationEngine';
+import { analyzeDataQuality, DataQualityReport } from './services/dataQualityEngine';
 import { AnalysisPanel } from './components/AnalysisPanel';
 import { ENTITY_DEFAULT_FIELDS } from './constants';
 import { DEFAULT_TOOLS } from './tools';
@@ -63,6 +64,7 @@ const App: React.FC = () => {
 
   // Investigation Analysis State (Completeness Analysis)
   const [investigationAnalysis, setInvestigationAnalysis] = useState<InvestigationAnalysis | null>(null);
+  const [dataQualityReport, setDataQualityReport] = useState<DataQualityReport | null>(null);
   const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
 
   // Briefing Report State
@@ -538,7 +540,7 @@ const App: React.FC = () => {
       return;
     }
 
-    addLog('🔍 正在进行网络分析 (社区发现 + 核心人物 + 完整性分析)...', 'info');
+    addLog('🔍 正在进行网络分析 (社区发现 + 核心人物 + 完整性分析 + 数据质量)...', 'info');
 
     // 1. 网络结构分析
     const graphResult = analyzeGraph(nodes, connections);
@@ -548,13 +550,17 @@ const App: React.FC = () => {
     const investigationResult = analyzeInvestigation(nodes, connections);
     setInvestigationAnalysis(investigationResult);
 
+    // 3. 数据质量分析
+    const qualityResult = analyzeDataQuality(nodes, connections);
+    setDataQualityReport(qualityResult);
+
     // Log analysis results
     const keyNodeNames = graphResult.keyNodes
       .map(id => nodes.find(n => n.id === id)?.title || id)
       .slice(0, 5);
 
     addLog(
-      `✓ 网络分析完成: ${graphResult.communityCount} 社区, ${graphResult.keyNodes.length} 核心节点, 平均完整性 ${(investigationResult.averageCompleteness * 100).toFixed(0)}%`,
+      `✓ 网络分析完成: ${graphResult.communityCount} 社区, ${graphResult.keyNodes.length} 核心节点, 完整性 ${(investigationResult.averageCompleteness * 100).toFixed(0)}%, 质量 ${(qualityResult.summary.averagePressure * 100).toFixed(0)}%`,
       'success'
     );
 
@@ -562,8 +568,9 @@ const App: React.FC = () => {
       addLog(`🌟 核心人物: ${keyNodeNames.join(', ')}${graphResult.keyNodes.length > 5 ? '...' : ''}`, 'info');
     }
 
-    if (investigationResult.prioritizedSuggestions.length > 0) {
-      addLog(`📋 发现 ${investigationResult.prioritizedSuggestions.length} 个需要完善的节点`, 'info');
+    if (investigationResult.prioritizedSuggestions.length > 0 || qualityResult.defectiveNodes.length > 0) {
+      const issueCount = investigationResult.prioritizedSuggestions.length + qualityResult.defectiveNodes.length;
+      addLog(`📋 发现 ${issueCount} 个需要关注的节点`, 'info');
     }
 
     // 打开分析面板
@@ -575,8 +582,9 @@ const App: React.FC = () => {
     if (nodes.length === 0) {
       if (graphAnalysis) setGraphAnalysis(null);
       if (investigationAnalysis) setInvestigationAnalysis(null);
+      if (dataQualityReport) setDataQualityReport(null);
     }
-  }, [nodes.length, graphAnalysis, investigationAnalysis]);
+  }, [nodes.length, graphAnalysis, investigationAnalysis, dataQualityReport]);
 
   const handleSearch = (term: string) => {
       setSearchTerm(term);
@@ -838,6 +846,7 @@ const App: React.FC = () => {
          nodes={nodes}
          graphAnalysis={graphAnalysis}
          investigationAnalysis={investigationAnalysis}
+         dataQualityReport={dataQualityReport}
          onNodeSelect={(nodeId) => {
            handleSelectionChange([nodeId]);
            // 滚动到节点位置（可选功能，暂时只选中）

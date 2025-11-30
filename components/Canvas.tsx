@@ -183,6 +183,23 @@ export const Canvas: React.FC<CanvasProps> = ({
     e.preventDefault();
   };
 
+  // Drag and Drop handlers for creating nodes
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/node-type')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const nodeType = e.dataTransfer.getData('application/node-type') as NodeType;
+    if (nodeType) {
+      const pos = getCanvasPos(e.clientX, e.clientY);
+      onAddNode(pos, nodeType);
+    }
+  };
+
   // --- Rendering Connections ---
   const renderConnections = () => {
     return connections.map(conn => {
@@ -246,6 +263,8 @@ export const Canvas: React.FC<CanvasProps> = ({
       onPointerUp={handlePointerUp}
       onContextMenu={handleContextMenu}
       onWheel={handleWheel}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       {/* Content Wrapper */}
       <div
