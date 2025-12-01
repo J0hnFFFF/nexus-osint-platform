@@ -1199,7 +1199,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                                         保存 API Key
                                     </button>
                                     <a
-                                        href="https://hetu.dev"
+                                        href="https://buy.hetu.click"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300 transition-colors flex items-center gap-2"
