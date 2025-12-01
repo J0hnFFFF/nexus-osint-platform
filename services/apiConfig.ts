@@ -4,7 +4,7 @@
  */
 
 // 河图网关地址 (内置固定)
-export const HETU_GATEWAY_URL = 'http://127.0.0.1:8000';
+export const HETU_GATEWAY_URL = 'http://api.hetu.click/';
 
 // ============ 机器码 ============
 
