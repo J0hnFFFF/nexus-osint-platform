@@ -13,7 +13,7 @@ import {
   Package, FileSpreadsheet, Monitor, Scroll, Briefcase, GraduationCap, Heart, Home, Wrench, Podcast, Cast
 } from 'lucide-react';
 import { NodeType, IntelNode, Tool, LogEntry, ToolCategory, AIModelConfig } from '../types';
-import { ENTITY_DEFAULT_FIELDS, AI_MODELS } from '../constants';
+import { ENTITY_DEFAULT_FIELDS, AI_MODELS, APP_VERSION, APP_VERSION_DISPLAY } from '../constants';
 import {
   HETU_GATEWAY_URL,
   getApiMode,
@@ -80,7 +80,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // Machine ID for license binding
   const [machineId, setMachineId] = useState<string>('加载中...');
-  
+
+  // Version Update State
+  const [updateInfo, setUpdateInfo] = useState<{
+    version: string;
+    download_url: string;
+    message: string;
+    force_update: boolean;
+  } | null>(null);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+
   // Plugin Creator State
   const [isCreatingTool, setIsCreatingTool] = useState(false);
   const [mockJsonText, setMockJsonText] = useState('{}');
@@ -106,6 +115,43 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   // Load machine ID on mount
   useEffect(() => {
     getMachineId().then(setMachineId);
+  }, []);
+
+  // Check for updates on mount (via Electron IPC to bypass CORS)
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        // 使用 Electron 主进程请求，避免 CORS 问题
+        const data = await window.electronAPI?.checkVersion();
+        if (!data) return;
+
+        const remoteVersion = data.version;
+
+        // Compare versions
+        if (compareVersions(remoteVersion, APP_VERSION) > 0) {
+          setUpdateInfo(data);
+          setShowUpdateDialog(true);
+        }
+      } catch (error) {
+        console.log('Version check failed:', error);
+      }
+    };
+
+    // Compare two version strings (e.g., "6.2.0" vs "6.1.0")
+    const compareVersions = (v1: string, v2: string): number => {
+      const parts1 = v1.split('.').map(Number);
+      const parts2 = v2.split('.').map(Number);
+
+      for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+      }
+      return 0;
+    };
+
+    checkForUpdates();
   }, []);
 
   // Check for API Key on component mount
@@ -1135,9 +1181,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                         <div className="bg-slate-900 border border-slate-700 rounded px-3 py-2 font-mono text-sm text-cyan-300 tracking-wider text-center select-all">
                             {machineId}
                         </div>
-                        <p className="text-[9px] text-slate-500 mt-1.5">
-                            请将机器码提供给管理员以绑定您的 API Key
-                        </p>
                     </div>
                 )}
 
@@ -1199,13 +1242,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                                         保存 API Key
                                     </button>
                                     <a
-                                        href="https://buy.hetu.click"
+                                        href="https://pay.ldxp.cn/item/hbjemp"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300 transition-colors flex items-center gap-2"
                                     >
                                         <Globe className="w-3.5 h-3.5" />
-                                        注册
+                                        购买
                                     </a>
                                 </div>
                             </div>
@@ -1428,13 +1471,57 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       <div className="p-2 bg-slate-950 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center">
          <div className="flex items-center gap-2">
-             <span>OSINT Kernel v6.1</span>
+             <span>{APP_VERSION_DISPLAY}</span>
              <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
                  {aiConfig.modelId.includes('flash') ? 'FLASH' : 'PRO'}
              </span>
          </div>
          {isProcessing && <span className="text-cyan-400 animate-pulse flex items-center gap-1"><Zap className="w-3 h-3"/> Processing...</span>}
       </div>
+
+      {/* Update Dialog */}
+      {showUpdateDialog && updateInfo && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg w-96 p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                <Download className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">发现新版本</h3>
+                <p className="text-sm text-slate-400">v{updateInfo.version} 可用</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-slate-300">{updateInfo.message}</p>
+            </div>
+
+            <div className="flex gap-3">
+              {!updateInfo.force_update && (
+                <button
+                  onClick={() => setShowUpdateDialog(false)}
+                  className="flex-1 px-4 py-2 text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors"
+                >
+                  稍后提醒
+                </button>
+              )}
+              <button
+                onClick={() => window.open(updateInfo.download_url, '_blank')}
+                className="flex-1 px-4 py-2 text-sm text-white bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors"
+              >
+                立即更新
+              </button>
+            </div>
+
+            {updateInfo.force_update && (
+              <p className="text-xs text-amber-400 mt-3 text-center">
+                此版本为强制更新，请更新后继续使用
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

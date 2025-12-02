@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getApiKey: () => ipcRenderer.invoke('get-api-key'),
   setApiKey: (apiKey) => ipcRenderer.invoke('set-api-key', apiKey),
   deleteApiKey: () => ipcRenderer.invoke('delete-api-key'),
-  onShowApiKeySetup: (callback) => ipcRenderer.on('show-api-key-setup', callback)
+  onShowApiKeySetup: (callback) => ipcRenderer.on('show-api-key-setup', callback),
+  checkVersion: () => ipcRenderer.invoke('check-version')
 });

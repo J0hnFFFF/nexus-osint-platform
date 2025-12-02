@@ -1,6 +1,10 @@
 
-
 import { NodeType } from './types';
+
+// 版本配置
+export const APP_VERSION = "6.2.0";
+export const APP_VERSION_DISPLAY = `OSINT Kernel v${APP_VERSION.slice(0, 3)}`;
+export const VERSION_CHECK_URL = "https://gitee.com/Err0rZero/hetu_version/raw/master/version.json";
 
 export const AI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (高速/通用)', description: '适合大多数情报提取和摘要任务，速度快。' },

@@ -4,7 +4,7 @@
  */
 
 // 河图网关地址 (内置固定)
-export const HETU_GATEWAY_URL = 'http://api.hetu.click/';
+export const HETU_GATEWAY_URL = 'https://hetu-admin.vercel.app';
 
 // ============ 机器码 ============
 

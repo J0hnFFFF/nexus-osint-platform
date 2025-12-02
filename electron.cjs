@@ -25,6 +25,19 @@ ipcMain.handle('delete-api-key', () => {
   return true;
 });
 
+// IPC 处理：版本检查（主进程无 CORS 限制）
+const VERSION_CHECK_URL = 'https://gitee.com/Err0rZero/hetu_version/raw/master/version.json';
+ipcMain.handle('check-version', async () => {
+  try {
+    const response = await fetch(VERSION_CHECK_URL);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.log('Version check failed:', error);
+    return null;
+  }
+});
+
 async function promptForApiKey(win) {
   // 在生产环境中，如果没有 API Key，显示设置提示
   const hasApiKey = store.get('apiKey');
